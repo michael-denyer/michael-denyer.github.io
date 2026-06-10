@@ -106,6 +106,16 @@ export function plaque(ctx, x, y, w, h, text, size, pal) {
   ctx.fillRect(x - w / 2 + 4, y + 4, w - 8, h - 8);
   ctx.fillStyle = LINE;
   ctx.font = `600 ${size}px Georgia, serif`;
+  // engraving must fit between the rivets — shrink the type, then truncate
+  const room = w - 34;
+  const measured = ctx.measureText(text).width;
+  if (measured > room) {
+    size = Math.max(8, Math.floor((size * room) / measured));
+    ctx.font = `600 ${size}px Georgia, serif`;
+    while (ctx.measureText(text).width > room && text.length > 4) {
+      text = text.slice(0, -2).trimEnd() + "…";
+    }
+  }
   ctx.textAlign = "center";
   ctx.fillText(text, x, y + h / 2 + size * 0.36);
   rivet(ctx, x - w / 2 + 11, y + h / 2, 3.5);
@@ -135,7 +145,7 @@ export function boiler(ctx, x, y, w, h, name, pressure, t, pal) {
   ctx.fillStyle = pal.brass;
   ctx.fillRect(x + w / 2 - 13, y - w / 2 - 34, 26, 8);
   gauge(ctx, x + w / 2, y + 120, w * 0.27, pressure, "", Math.sin(t * 0.005 + x) * 0.04 * (0.3 + pressure), pal);
-  plaque(ctx, x + w / 2, y + 190, Math.min(w + 48, 14 + name.length * 11), 34, name, 15, pal);
+  plaque(ctx, x + w / 2, y + 190, w + 14, 34, name.toUpperCase(), 15, pal);
 }
 
 export function aetherTube(ctx, pts, t, pal, pulseCount = 3) {
