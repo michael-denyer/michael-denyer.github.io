@@ -76,6 +76,30 @@ html, body {
   box-shadow: 0 0 16px rgba(79, 216, 200, 0.6);
 }
 
+#sfx {
+  position: fixed;
+  right: 18px;
+  top: 70px;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  color: #2b2008;
+  background: linear-gradient(#caa64a, #a8842f);
+  border: 2px solid #6b5226;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5);
+}
+
+#sfx:hover {
+  box-shadow: 0 0 16px rgba(79, 216, 200, 0.6);
+}
+
+#sfx.muted {
+  color: #7a6a4a;
+  text-decoration: line-through;
+}
+
 .hint {
   position: fixed;
   left: 18px;

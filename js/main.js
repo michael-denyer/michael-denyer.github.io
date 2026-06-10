@@ -1,4 +1,5 @@
 import * as S from "./sprites.js";
+import * as sfx from "./audio.js";
 import { fallback, fetchLive } from "./data.js";
 
 const W = 1920, H = 1080;
@@ -63,6 +64,12 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
 document.getElementById("mode").addEventListener("click", () => {
   pal = pal.name === "night" ? DAY : NIGHT;
 });
+const sfxBtn = document.getElementById("sfx");
+sfxBtn.addEventListener("click", () => {
+  sfx.setMuted(!sfx.isMuted());
+  sfxBtn.classList.toggle("muted", sfx.isMuted());
+  sfxBtn.setAttribute("aria-pressed", String(!sfx.isMuted()));
+});
 
 let data = fallback;
 fetchLive().then((d) => { data = d; });
@@ -81,7 +88,7 @@ const par = { x: 0, y: 0 };
 
 // ---- interactions --------------------------------------------------------
 // fx values are "active until" timestamps in frame time.
-const fx = { whistle: 0, woof: 0, telegraph: 0, surge: 0, pets: new Map() };
+const fx = { whistle: 0, woof: 0, telegraph: 0, surge: 0, zoomie: 0, pets: new Map() };
 let steamBursts = [], hearts = [], scraps = [], sparks = [], bubbles = [];
 let nowT = 0;
 
@@ -122,14 +129,40 @@ function speak(x, y, text) {
   bubbles.push({ x, y, text, born: nowT });
 }
 
+// Every resident reacts in their own way.
 function trigger(h) {
   if (h.act === "pet") {
-    fx.pets.set(h.id, nowT + 1900);
     spawnHearts(h.x, h.y);
-    if (h.id === "sleeper") speak(h.x, h.y - 50, "prrt?");
+    if (h.id === "sleeper") {
+      // the boiler cat IS the purr — deep rumble, gentle vibration
+      fx.pets.set(h.id, nowT + 2600);
+      speak(h.x, h.y - 50, "purrrrrr…");
+      sfx.purr();
+    } else if (h.id === "kitten") {
+      // delighted mew, then zoomies after the runaway gear
+      fx.pets.set(h.id, nowT + 1600);
+      fx.zoomie = nowT + 3200;
+      speak(h.x, h.y - 90, "mew!");
+      sfx.mew();
+    } else if (h.id === "ladder") {
+      // so pleased the wrench gets dropped
+      fx.pets.set(h.id, nowT + 1900);
+      sfx.clank();
+      for (let i = 0; i < 5; i++) {
+        sparks.push({ x: h.x + 30, y: h.y + 60, vx: (Math.random() - 0.5) * 2,
+          vy: -Math.random() * 1.5, a: 1, col: "230,200,120" });
+      }
+    } else if (h.id === "operator") {
+      // purrs in morse, naturally
+      fx.pets.set(h.id, nowT + 1900);
+      fx.telegraph = Math.max(fx.telegraph, nowT + 1200);
+      speak(h.x, h.y - 130, "·· prr ··");
+      sfx.morse([0, 0, 1, 0, 0], 640);
+    }
   } else if (h.act === "woof") {
     fx.woof = nowT + 1900;
     speak(330, FLOOR - 170, "WOOF!");
+    sfx.woof();
     for (let i = 0; i < 12; i++) {
       sparks.push({ x: 160 + Math.random() * 60, y: 800, vx: (Math.random() - 0.5) * 1.6,
         vy: -1.5 - Math.random() * 2.5, a: 1, col: "255,155,60" });
@@ -137,15 +170,18 @@ function trigger(h) {
   } else if (h.act === "whistle") {
     fx.whistle = nowT + 2400;
     speak(WHISTLE.x - 30, WHISTLE.y - 120, "TOOOOT!");
+    sfx.toot();
   } else if (h.act === "telegraph") {
     fx.telegraph = nowT + 3200;
     speak(1068, 640, "· · — ·");
+    sfx.morse([0, 0, 1, 0]);
     for (let i = 0; i < 10; i++) {
       scraps.push({ x: 1110, y: 740, vx: 1 + Math.random() * 2.5,
         vy: -2 - Math.random() * 2, rot: Math.random() * 7, a: 1 });
     }
   } else if (h.act === "surge") {
     fx.surge = nowT + 2300;
+    sfx.zap();
     for (let i = 0; i < 14; i++) {
       sparks.push({ x: h.x, y: h.y, vx: (Math.random() - 0.5) * 4,
         vy: (Math.random() - 0.7) * 4, a: 1, col: "120,236,220" });
@@ -373,9 +409,13 @@ function cast(t) {
   ctx.restore();
   ctx.restore();
 
-  // sleeping cat on middle boiler dome
+  // sleeping cat on middle boiler dome (vibrates while purring)
+  const purring = (fx.pets.get("sleeper") ?? 0) > nowT;
   ctx.save();
-  ctx.translate(boilerXs[1] + 75, 392);
+  ctx.translate(
+    boilerXs[1] + 75 + (purring ? Math.sin(t * 0.15) * 1.4 : 0),
+    392 + (purring ? Math.sin(t * 0.11) * 0.8 : 0),
+  );
   S.catCurl(ctx, "#3a3a41", "#26262c", t, 1.4);
   ctx.restore();
 
@@ -394,8 +434,8 @@ function cast(t) {
   S.dogStoker(ctx, t, pal);
   ctx.restore();
 
-  // runaway gear + chasing kitten
-  runaway.x += runaway.dir * 1.5;
+  // runaway gear + chasing kitten (zoomies when freshly petted)
+  runaway.x += runaway.dir * (fx.zoomie > nowT ? 3.6 : 1.5);
   if (runaway.x > runaway.max || runaway.x < runaway.min) runaway.dir *= -1;
   S.gear(ctx, runaway.x, FLOOR - 26, 26, 8, runaway.x * 0.05, pal.brassLight, pal.brassDark, pal.floor);
   ctx.save();
