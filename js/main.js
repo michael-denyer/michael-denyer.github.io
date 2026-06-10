@@ -89,8 +89,13 @@ const par = { x: 0, y: 0 };
 // ---- interactions --------------------------------------------------------
 // fx values are "active until" timestamps in frame time.
 const fx = { whistle: 0, woof: 0, telegraph: 0, surge: 0, zoomie: 0, pets: new Map() };
-let steamBursts = [], hearts = [], scraps = [], sparks = [], bubbles = [];
+let steamBursts = [], hearts = [], scraps = [], sparks = [], bubbles = [], parcels = [];
 let nowT = 0;
+
+const AIRSHIP_Y = 150;
+function airshipX(t) {
+  return ((t * 0.055 + 900) % (W + 760)) - 380;
+}
 
 const JUNCTIONS = [[430, 300], [900, 300], [900, 180], [820, 640]];
 const WHISTLE = { x: 1285, y: 330 };
@@ -103,6 +108,7 @@ function hotspots() {
     { x: 950, y: 700, r: 75, act: "pet", id: "operator" },
     { x: kx, y: FLOOR - 30, r: 65, act: "pet", id: "kitten" },
     { x: 330, y: FLOOR - 55, r: 85, act: "woof" },
+    { x: airshipX(nowT), y: AIRSHIP_Y + 20, r: 115, act: "airdrop" },
     { x: WHISTLE.x, y: WHISTLE.y + 30, r: 65, act: "whistle" },
     { x: 1068, y: 735, r: 60, act: "telegraph" },
     ...JUNCTIONS.map(([jx, jy]) => ({ x: jx, y: jy, r: 42, act: "surge" })),
@@ -166,6 +172,14 @@ function trigger(h) {
     for (let i = 0; i < 12; i++) {
       sparks.push({ x: 160 + Math.random() * 60, y: 800, vx: (Math.random() - 0.5) * 1.6,
         vy: -1.5 - Math.random() * 2.5, a: 1, col: "255,155,60" });
+    }
+  } else if (h.act === "airdrop") {
+    const ax = airshipX(nowT);
+    speak(ax + 20, AIRSHIP_Y - 60, "yip!");
+    sfx.yip();
+    if (parcels.length < 3) {
+      parcels.push({ x: ax + 6, y: AIRSHIP_Y + 90, vy: 0.3, ph: Math.random() * 7,
+        landedAt: 0 });
     }
   } else if (h.act === "whistle") {
     fx.whistle = nowT + 2400;
@@ -464,6 +478,58 @@ function cast(t) {
 }
 
 function effects(t) {
+  // parachute parcels from the airship: drift down, land, pop into paper
+  parcels = parcels.filter((p) => !p.landedAt || nowT - p.landedAt < 1400);
+  for (const p of parcels) {
+    if (!p.landedAt) {
+      p.vy = Math.min(1.5, p.vy + 0.02);
+      p.y += p.vy;
+      p.x += Math.sin(t * 0.002 + p.ph) * 0.8;
+      if (p.y >= FLOOR - 14) {
+        p.landedAt = nowT;
+        sfx.clank();
+        for (let i = 0; i < 8; i++) {
+          scraps.push({ x: p.x, y: p.y - 8, vx: (Math.random() - 0.5) * 3.4,
+            vy: -1.5 - Math.random() * 2.4, rot: Math.random() * 7, a: 1 });
+        }
+      }
+    }
+    const fade = p.landedAt ? Math.max(0, 1 - (nowT - p.landedAt) / 1400) : 1;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.globalAlpha = fade;
+    if (!p.landedAt) {
+      const sway = Math.sin(t * 0.002 + p.ph) * 0.12;
+      ctx.rotate(sway);
+      ctx.fillStyle = "#e8d9b8";
+      ctx.beginPath();
+      ctx.arc(0, -52, 26, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(120,100,70,0.9)";
+      ctx.lineWidth = 1.6;
+      for (const cx2 of [-24, -8, 8, 24]) {
+        ctx.beginPath();
+        ctx.moveTo(cx2, -50);
+        ctx.lineTo(cx2 * 0.3, -14);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = "#8a5f3c";
+    ctx.fillRect(-14, -14, 28, 24);
+    ctx.strokeStyle = "#5a4632";
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(-14, -14, 28, 24);
+    ctx.beginPath();
+    ctx.moveTo(0, -14); ctx.lineTo(0, 10);
+    ctx.moveTo(-14, -2); ctx.lineTo(14, -2);
+    ctx.stroke();
+    ctx.fillStyle = "#f0e6cb";
+    ctx.font = "700 10px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText("PR", 0, -4.5);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
   hearts = hearts.filter((h) => h.a > 0.02);
   for (const h of hearts) {
     h.y += h.vy; h.a *= 0.985;

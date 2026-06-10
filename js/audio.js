@@ -181,6 +181,27 @@ export function morse(pattern, freq = 720) {
   }
 }
 
+// small dog, big altitude — two sharp little yips
+export function yip() {
+  const a = ac();
+  if (!a) return;
+  for (const dt of [0, 0.16]) {
+    const t0 = a.currentTime + dt;
+    const osc = a.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(520, t0);
+    osc.frequency.exponentialRampToValueAtTime(290, t0 + 0.07);
+    const lp = a.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1400;
+    const g = a.createGain();
+    env(a, g, t0, 0.008, 0.025, 0.06, 0.4);
+    osc.connect(lp).connect(g).connect(master);
+    osc.start(t0);
+    osc.stop(t0 + 0.13);
+  }
+}
+
 export function zap() {
   const a = ac();
   if (!a) return;
