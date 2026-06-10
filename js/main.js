@@ -75,12 +75,88 @@ addEventListener("pointermove", (e) => {
   mouse.y = e.clientY / innerHeight;
   mouse.px = (e.clientX - view.ox) / view.scale;
   mouse.py = (e.clientY - view.oy) / view.scale;
+  canvas.style.cursor = hitSpot() ? "pointer" : "default";
 });
 const par = { x: 0, y: 0 };
 
-let steamBursts = [];
+// ---- interactions --------------------------------------------------------
+// fx values are "active until" timestamps in frame time.
+const fx = { whistle: 0, woof: 0, telegraph: 0, surge: 0, pets: new Map() };
+let steamBursts = [], hearts = [], scraps = [], sparks = [], bubbles = [];
+let nowT = 0;
+
+const JUNCTIONS = [[430, 300], [900, 300], [900, 180], [820, 640]];
+const WHISTLE = { x: 1285, y: 330 };
+
+function hotspots() {
+  const kx = runaway.x - runaway.dir * 92;
+  return [
+    { x: 1432, y: 505, r: 75, act: "pet", id: "ladder" },
+    { x: boilerXs[1] + 75, y: 372, r: 65, act: "pet", id: "sleeper" },
+    { x: 950, y: 700, r: 75, act: "pet", id: "operator" },
+    { x: kx, y: FLOOR - 30, r: 65, act: "pet", id: "kitten" },
+    { x: 330, y: FLOOR - 55, r: 85, act: "woof" },
+    { x: WHISTLE.x, y: WHISTLE.y + 30, r: 65, act: "whistle" },
+    { x: 1068, y: 735, r: 60, act: "telegraph" },
+    ...JUNCTIONS.map(([jx, jy]) => ({ x: jx, y: jy, r: 42, act: "surge" })),
+  ];
+}
+
+function hitSpot() {
+  let best = null, bd = 1e9;
+  for (const h of hotspots()) {
+    const d = Math.hypot(h.x - mouse.px, h.y - mouse.py);
+    if (d < h.r && d < bd) { bd = d; best = h; }
+  }
+  return best;
+}
+
+function spawnHearts(x, y) {
+  for (let i = 0; i < 6; i++) {
+    hearts.push({ x: x + (Math.random() - 0.5) * 50, y: y - 60 - Math.random() * 30,
+      vy: -0.5 - Math.random() * 0.6, ph: Math.random() * 7, a: 1, s: 7 + Math.random() * 7 });
+  }
+}
+
+function speak(x, y, text) {
+  bubbles.push({ x, y, text, born: nowT });
+}
+
+function trigger(h) {
+  if (h.act === "pet") {
+    fx.pets.set(h.id, nowT + 1900);
+    spawnHearts(h.x, h.y);
+    if (h.id === "sleeper") speak(h.x, h.y - 50, "prrt?");
+  } else if (h.act === "woof") {
+    fx.woof = nowT + 1900;
+    speak(330, FLOOR - 170, "WOOF!");
+    for (let i = 0; i < 12; i++) {
+      sparks.push({ x: 160 + Math.random() * 60, y: 800, vx: (Math.random() - 0.5) * 1.6,
+        vy: -1.5 - Math.random() * 2.5, a: 1, col: "255,155,60" });
+    }
+  } else if (h.act === "whistle") {
+    fx.whistle = nowT + 2400;
+    speak(WHISTLE.x - 30, WHISTLE.y - 120, "TOOOOT!");
+  } else if (h.act === "telegraph") {
+    fx.telegraph = nowT + 3200;
+    speak(1068, 640, "· · — ·");
+    for (let i = 0; i < 10; i++) {
+      scraps.push({ x: 1110, y: 740, vx: 1 + Math.random() * 2.5,
+        vy: -2 - Math.random() * 2, rot: Math.random() * 7, a: 1 });
+    }
+  } else if (h.act === "surge") {
+    fx.surge = nowT + 2300;
+    for (let i = 0; i < 14; i++) {
+      sparks.push({ x: h.x, y: h.y, vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.7) * 4, a: 1, col: "120,236,220" });
+    }
+  }
+}
+
 addEventListener("pointerdown", () => {
-  // vent steam from the nearest boiler valve
+  const h = hitSpot();
+  if (h) { trigger(h); return; }
+  // otherwise vent steam from the nearest boiler valve
   const valves = boilerXs.map((x) => ({ x: x + 75, y: 392 }));
   let best = valves[0], bd = 1e9;
   for (const v of valves) {
@@ -109,11 +185,16 @@ let plumes = Array.from({ length: 7 }, (_, i) => ({
 }));
 const runaway = { x: 760, dir: 1, min: 700, max: 1240 };
 
-function look(cx, cy) {
+function look(cx, cy, petId) {
   const dx = mouse.px - cx, dy = mouse.py - cy;
   const d = Math.hypot(dx, dy) || 1;
   const m = Math.min(3.2, d * 0.02);
-  return { x: (dx / d) * m, y: (dy / d) * m };
+  return {
+    x: (dx / d) * m,
+    y: (dy / d) * m,
+    happy: petId ? (fx.pets.get(petId) ?? 0) > nowT : false,
+    startle: fx.whistle > nowT,
+  };
 }
 
 function layer(fx, fy, fn) {
@@ -178,16 +259,20 @@ function machines(t) {
     softGlow(lx, FLOOR + 40, 210, 30, pal.poolRGB, pal.poolA);
   }
 
-  // aether conduits across the wall
-  S.aetherTube(ctx, [[430, 560], [430, 300], [900, 300], [900, 180], [1400, 180], [1490, 330]], t, pal, 4);
-  S.aetherTube(ctx, [[520, 640], [820, 640], [820, 760]], t, pal, 2);
+  // aether conduits across the wall (surge brightens and speeds the pulses)
+  const tubePal = fx.surge > nowT
+    ? { ...pal, aetherGlow: 34, aetherDim: pal.aether, aetherBright: "#eafffb" }
+    : pal;
+  S.aetherTube(ctx, [[430, 560], [430, 300], [900, 300], [900, 180], [1400, 180], [1490, 330]], pulsePhase, tubePal, 4);
+  S.aetherTube(ctx, [[520, 640], [820, 640], [820, 760]], pulsePhase, tubePal, 2);
 
   // furnace (left)
   ctx.fillStyle = pal.copperDark;
   ctx.fillRect(60, 560, 240, FLOOR - 560);
   ctx.fillStyle = pal.copper;
   ctx.fillRect(74, 574, 212, FLOOR - 588);
-  const fireA = 0.75 + 0.25 * Math.sin(t * 0.02) * Math.sin(t * 0.007);
+  const fireA = 0.75 + 0.25 * Math.sin(t * 0.02) * Math.sin(t * 0.007)
+    + (fx.woof > nowT ? 0.3 : 0);
   ctx.fillStyle = pal.fireGlow;
   ctx.globalAlpha = fireA;
   ctx.fillRect(96, 660, 168, 200);
@@ -216,11 +301,12 @@ function machines(t) {
   ctx.fillStyle = "#15110e";
   ctx.beginPath(); ctx.ellipse(360, FLOOR + 6, 70, 26, 0, Math.PI, 0); ctx.fill();
 
-  // mainspring machine (center-left)
+  // mainspring machine (center-left); gearPhase accumulates so the surge
+  // overspeed accelerates smoothly instead of teleporting the teeth
   ctx.fillStyle = pal.copperDark;
   ctx.fillRect(470, 500, 60, FLOOR - 500);
-  S.gear(ctx, 500, 700, 130, 16, t * 0.0011 * (0.4 + data.streakDays / 30), pal.brass, pal.brassDark, pal.wallBottom);
-  S.gear(ctx, 640, 800, 64, 10, -t * 0.0011 * (0.4 + data.streakDays / 30) * (130 / 64), pal.copper, pal.copperDark, pal.wallBottom);
+  S.gear(ctx, 500, 700, 130, 16, gearPhase * (0.4 + data.streakDays / 30), pal.brass, pal.brassDark, pal.wallBottom);
+  S.gear(ctx, 640, 800, 64, 10, -gearPhase * (0.4 + data.streakDays / 30) * (130 / 64), pal.copper, pal.copperDark, pal.wallBottom);
   S.gauge(ctx, 500, 430, 96, Math.min(1, data.streakDays / 30), "MAINSPRING", Math.sin(t * 0.004) * 0.012, pal);
   S.plaque(ctx, 500, 540, 220, 34, `${data.streakDays} days under steam`, 15, pal);
 
@@ -234,8 +320,15 @@ function machines(t) {
   ctx.fillRect(1020, 716, 96, 54);
   ctx.fillStyle = pal.brass;
   ctx.fillRect(1028, 724, 80, 38);
-  S.gear(ctx, 1068, 700, 26, 8, t * 0.004, pal.brassLight, pal.brassDark, pal.brass);
+  S.gear(ctx, 1068, 700, 26, 8, gearPhase * 3.6, pal.brassLight, pal.brassDark, pal.brass);
   S.plaque(ctx, 1010, 880, 250, 34, "COMMIT TELEGRAPH", 15, pal);
+
+  // steam whistle on the wall by the boiler bank
+  const yank = fx.whistle > nowT ? Math.min(1, (fx.whistle - nowT) / 600) : 0;
+  ctx.save();
+  ctx.translate(WHISTLE.x, WHISTLE.y);
+  S.steamWhistle(ctx, t, yank, pal);
+  ctx.restore();
 
   // boiler bank (right) on platform
   ctx.fillStyle = pal.copperDark;
@@ -265,7 +358,7 @@ function cast(t) {
   ctx.save();
   ctx.translate(1432, 560);
   ctx.scale(0.92, 0.92);
-  S.catSit(ctx, "#e8954f", "#f5d9b8", t, 0.2, look(1432, 500), pal);
+  S.catSit(ctx, "#e8954f", "#f5d9b8", t, 0.2, look(1432, 500, "ladder"), pal);
   const wa = Math.sin(t * 0.006) * 0.35;
   ctx.save();
   ctx.translate(20, -46);
@@ -289,12 +382,14 @@ function cast(t) {
   // telegraph operator (grey) on desk stool
   ctx.save();
   ctx.translate(940, 770);
-  S.catOperator(ctx, "#9a9aa8", "#c8c8d4", t, 0.6, look(940, 700), pal);
+  S.catOperator(ctx, "#9a9aa8", "#c8c8d4", t, 0.6, look(940, 700, "operator"), pal,
+    fx.telegraph > nowT ? 4 : 1);
   ctx.restore();
 
-  // stoker bulldog at the furnace
+  // stoker bulldog at the furnace (hops when boop'd)
+  const hop = fx.woof > nowT ? Math.abs(Math.sin(t * 0.02)) * 16 : 0;
   ctx.save();
-  ctx.translate(330, FLOOR);
+  ctx.translate(330, FLOOR - hop);
   ctx.scale(-1.05, 1.05);
   S.dogStoker(ctx, t, pal);
   ctx.restore();
@@ -306,8 +401,19 @@ function cast(t) {
   ctx.save();
   const kx = runaway.x - runaway.dir * 92;
   ctx.translate(kx, FLOOR);
-  S.catRun(ctx, "#f0ece2", "#e8954f", t, runaway.dir, look(kx, FLOOR - 30), pal);
+  S.catRun(ctx, "#f0ece2", "#e8954f", t, runaway.dir, look(kx, FLOOR - 30, "kitten"), pal);
   ctx.restore();
+
+  // startle marks while the whistle is screaming
+  if (fx.whistle > nowT) {
+    ctx.fillStyle = "#ffd24a";
+    ctx.font = "700 38px Georgia, serif";
+    ctx.textAlign = "center";
+    const jitter = Math.sin(t * 0.05) * 2;
+    for (const [ex, ey] of [[1432, 428], [950, 660], [kx, FLOOR - 120], [boilerXs[1] + 40, 330]]) {
+      ctx.fillText("!", ex + jitter, ey);
+    }
+  }
 
   // airship crossing the rafters (~45s per crossing, on screen at load)
   const ax = ((t * 0.055 + 900) % (W + 760)) - 380;
@@ -315,6 +421,73 @@ function cast(t) {
   ctx.translate(ax, 150);
   S.airship(ctx, t, `${data.openPrs} PR${data.openPrs === 1 ? "" : "S"} INBOUND`, pal);
   ctx.restore();
+}
+
+function effects(t) {
+  hearts = hearts.filter((h) => h.a > 0.02);
+  for (const h of hearts) {
+    h.y += h.vy; h.a *= 0.985;
+    ctx.save();
+    ctx.translate(h.x + Math.sin(h.y * 0.06 + h.ph) * 8, h.y);
+    ctx.scale(h.s / 10, h.s / 10);
+    ctx.globalAlpha = h.a;
+    ctx.fillStyle = "#ed7ba0";
+    ctx.beginPath();
+    ctx.moveTo(0, 3);
+    ctx.bezierCurveTo(-8, -5, -3, -10, 0, -5);
+    ctx.bezierCurveTo(3, -10, 8, -5, 0, 3);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  scraps = scraps.filter((s) => s.a > 0.02);
+  for (const s of scraps) {
+    s.x += s.vx; s.y += s.vy; s.vy += 0.09; s.rot += 0.1; s.a *= 0.978;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = "#f0e6cb";
+    ctx.fillRect(-7, -4, 14, 8);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  sparks = sparks.filter((s) => s.a > 0.03);
+  for (const s of sparks) {
+    s.x += s.vx; s.y += s.vy; s.vy += 0.05; s.a *= 0.95;
+    softGlow(s.x, s.y, 7, 7, s.col, s.a);
+    ctx.fillStyle = `rgba(${s.col},${s.a})`;
+    ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
+  }
+  bubbles = bubbles.filter((b) => nowT - b.born < 1700);
+  for (const b of bubbles) {
+    const age = nowT - b.born;
+    const pop = Math.min(1, age / 140);
+    const fade = age > 1300 ? 1 - (age - 1300) / 400 : 1;
+    ctx.save();
+    ctx.translate(b.x, b.y - pop * 8);
+    ctx.scale(pop, pop);
+    ctx.globalAlpha = fade;
+    ctx.font = "700 24px Georgia, serif";
+    const w = ctx.measureText(b.text).width + 28;
+    ctx.fillStyle = "#f5ead2";
+    ctx.strokeStyle = "#6b5226";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -42, w, 42, 9);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8, 0); ctx.lineTo(10, 14); ctx.lineTo(8, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = S.LINE;
+    ctx.textAlign = "center";
+    ctx.fillText(b.text, 0, -12);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function atmosphere(t) {
@@ -325,12 +498,17 @@ function atmosphere(t) {
     const wob = Math.sin(t * 0.0005 + p.ph) * 30;
     softGlow(p.x, p.y + wob, p.r, p.r * 0.55, pal.steamRGB, pal.steamA);
   }
-  // boiler valve steam + click bursts
+  // boiler valve steam + click bursts; the whistle makes every valve scream
+  const screaming = fx.whistle > nowT;
   for (const bx of boilerXs) {
-    if (Math.sin(t * 0.001 + bx) > 0.55) {
-      const f = (t * 0.06 + bx) % 60;
-      softGlow(bx + 75, 380 - f, 14 + f * 0.5, 14 + f * 0.5, pal.steamRGB, 0.5);
+    if (screaming || Math.sin(t * 0.001 + bx) > 0.55) {
+      const f = (t * (screaming ? 0.22 : 0.06) + bx) % 60;
+      softGlow(bx + 75, 380 - f, 14 + f * 0.5, 14 + f * 0.5, pal.steamRGB, screaming ? 0.8 : 0.5);
     }
+  }
+  if (screaming) {
+    const f = (t * 0.3) % 80;
+    softGlow(WHISTLE.x - 4, WHISTLE.y - 96 - f, 16 + f * 0.5, 16 + f * 0.5, pal.steamRGB, 0.85);
   }
   steamBursts = steamBursts.filter((s) => s.a > 0.01);
   for (const s of steamBursts) {
@@ -368,7 +546,7 @@ function ticker(t) {
   const text = data.ticker.join("   ···   ") + "   ···   ";
   ctx.font = "500 19px ui-monospace, Menlo, monospace";
   const tw = ctx.measureText(text).width;
-  const off = (t * 0.07) % tw;
+  const off = tickerPos % tw;
   ctx.fillStyle = "rgba(240,230,205,0.92)";
   ctx.fillRect(0, H - 44, W, 44);
   ctx.fillStyle = "#beb39a";
@@ -402,17 +580,33 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+let gearPhase = 0, pulsePhase = 0, tickerPos = 0, lastT = 0;
+
 function frame(t) {
+  nowT = t;
+  const dt = Math.min(100, t - lastT);
+  lastT = t;
+  const surging = fx.surge > nowT;
+  gearPhase += dt * 0.0011 * (surging ? 3 : 1);
+  pulsePhase += dt * (surging ? 4 : 1);
+  tickerPos += dt * 0.07 * (fx.telegraph > nowT ? 3.2 : 1);
   const idleX = Math.sin(t * 0.00015) * 0.3;
   par.x += ((mouse.x - 0.5) * 2 + idleX - par.x) * 0.04;
   par.y += ((mouse.y - 0.5) * 2 - par.y) * 0.04;
   ctx.clearRect(-200, -200, W + 400, H + 400);
   layer(-10, -6, () => wall(t));
   layer(-18, -10, () => lamps(t));
-  layer(-26, -14, () => { machines(t); cast(t); });
+  layer(-26, -14, () => { machines(t); cast(t); effects(t); });
   layer(-40, -22, () => atmosphere(t));
   layer(-60, -34, () => foreground(t));
   ticker(t);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// hidden hook for visual testing: /#fxtest fires every interaction at once
+if (location.hash === "#fxtest") {
+  setTimeout(() => {
+    for (const h of hotspots()) trigger(h);
+  }, 1400);
+}

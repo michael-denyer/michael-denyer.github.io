@@ -226,7 +226,23 @@ function ear(ctx, x, y, s, col, tilt) {
   ctx.fill();
 }
 
-function catEyes(ctx, cx, cy, gap, r, lookX, lookY, glowAlpha, eyeCol) {
+// look = {x, y, happy?, startle?} — happy draws blissful closed arcs,
+// startle widens the pupils; both override normal cursor tracking.
+function catEyes(ctx, cx, cy, gap, r, look, glowAlpha, eyeCol) {
+  if (look.happy) {
+    ctx.strokeStyle = LINE;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    for (const dx of [-gap, gap]) {
+      ctx.beginPath();
+      ctx.arc(cx + dx, cy + r * 0.6, r * 1.2, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
+    }
+    return;
+  }
+  const pr = look.startle ? r * 1.05 : r * 0.72;
+  const lx = look.startle ? 0 : look.x;
+  const ly = look.startle ? 0 : look.y;
   for (const dx of [-gap, gap]) {
     if (glowAlpha > 0) {
       ctx.fillStyle = eyeCol;
@@ -238,11 +254,11 @@ function catEyes(ctx, cx, cy, gap, r, lookX, lookY, glowAlpha, eyeCol) {
     }
     ctx.fillStyle = "#e8f0d8";
     ctx.beginPath();
-    ctx.arc(cx + dx, cy, r + 1, 0, 7);
+    ctx.arc(cx + dx, cy, r + (look.startle ? 2.2 : 1), 0, 7);
     ctx.fill();
     ctx.fillStyle = LINE;
     ctx.beginPath();
-    ctx.arc(cx + dx + lookX, cy + lookY, r * 0.72, 0, 7);
+    ctx.arc(cx + dx + lx, cy + ly, pr, 0, 7);
     ctx.fill();
   }
 }
@@ -278,7 +294,7 @@ export function catSit(ctx, col, shade, t, ph, look, pal, withGoggles = true) {
   ear(ctx, -22, -89, 15, col, 0.35);
   ear(ctx, 6, -89, 15, col, 0.65);
   if (withGoggles) goggles(ctx, 0, -74, 7, 23);
-  catEyes(ctx, 0, -76, 9.5, 3, look.x, look.y, pal.eyeGlow, "#8fe8c8");
+  catEyes(ctx, 0, -76, 9.5, 3, look, pal.eyeGlow, "#8fe8c8");
   ctx.fillStyle = "#d98a8a";
   ctx.beginPath();
   ctx.arc(0, -67, 2.4, 0, 7);
@@ -360,7 +376,9 @@ export function catRun(ctx, col, patch, t, dir, look, pal) {
   ctx.fill();
   ear(ctx, 17, -37, 11, col, 0.4);
   ear(ctx, 32, -38, 11, col, 0.6);
-  catEyes(ctx, 31, -28, 5.5, 2.2, look.x * dir, look.y, pal.eyeGlow, "#8fe8c8");
+  catEyes(ctx, 31, -28, 5.5, 2.2,
+    { x: look.x * dir, y: look.y, happy: look.happy, startle: look.startle },
+    pal.eyeGlow, "#8fe8c8");
   ctx.fillStyle = "#d98a8a";
   ctx.beginPath();
   ctx.arc(40, -22, 2, 0, 7);
@@ -370,8 +388,8 @@ export function catRun(ctx, col, patch, t, dir, look, pal) {
 }
 
 // Telegraph operator cat seated in profile, paw tapping
-export function catOperator(ctx, col, shade, t, ph, look, pal) {
-  const tap = Math.max(0, Math.sin(t * 0.012 + ph)) * 8;
+export function catOperator(ctx, col, shade, t, ph, look, pal, tapBoost = 1) {
+  const tap = Math.max(0, Math.sin(t * 0.012 * tapBoost + ph)) * 8;
   const sw = Math.sin(t * 0.002 + ph);
   ctx.strokeStyle = col;
   ctx.lineWidth = 10;
@@ -405,11 +423,46 @@ export function catOperator(ctx, col, shade, t, ph, look, pal) {
   ear(ctx, -10, -80, 14, col, 0.35);
   ear(ctx, 16, -81, 14, col, 0.65);
   goggles(ctx, 10, -66, 6.4, 21);
-  catEyes(ctx, 12, -68, 8.5, 2.8, look.x, look.y, pal.eyeGlow, "#8fe8c8");
+  catEyes(ctx, 12, -68, 8.5, 2.8, look, pal.eyeGlow, "#8fe8c8");
   ctx.fillStyle = "#d98a8a";
   ctx.beginPath();
   ctx.arc(13, -60, 2.2, 0, 7);
   ctx.fill();
+}
+
+// Wall-mounted steam whistle with a pull cord. Origin: bracket center.
+// yank 0..1 pulls the cord and tilts the bell.
+export function steamWhistle(ctx, t, yank, pal) {
+  ctx.fillStyle = pal.brassDark;
+  ctx.fillRect(-10, -8, 20, 46);
+  rivet(ctx, 0, 30, 3.5);
+  ctx.save();
+  ctx.rotate(yank * 0.1);
+  ctx.fillStyle = pal.brass;
+  ctx.fillRect(-7, -52, 14, 48);
+  ctx.beginPath();
+  ctx.moveTo(-16, -52);
+  ctx.lineTo(16, -52);
+  ctx.lineTo(10, -86);
+  ctx.lineTo(-10, -86);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = pal.brassDark;
+  ctx.fillRect(-16, -56, 32, 7);
+  ctx.restore();
+  const cordLen = 58 + yank * 22;
+  const swing = yank > 0 ? 0 : Math.sin(t * 0.0016) * 5;
+  ctx.strokeStyle = "#8a6d2f";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(8, 20);
+  ctx.quadraticCurveTo(10 + swing, 20 + cordLen * 0.6, 8 + swing, 20 + cordLen);
+  ctx.stroke();
+  ctx.strokeStyle = pal.brass;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(8 + swing, 28 + cordLen, 8, 0, 7);
+  ctx.stroke();
 }
 
 // Bulldog stoker shoveling coal, side profile facing right
