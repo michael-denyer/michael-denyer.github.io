@@ -398,8 +398,6 @@ function resize() {
     oy: (innerHeight - H * scale) / 2,
   };
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * view.ox, dpr * view.oy);
-  view.scale *= 1; // logical px mapping for pointer math
-  view.ox *= 1;
 }
 addEventListener("resize", resize);
 resize();
