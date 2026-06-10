@@ -106,14 +106,20 @@ export function plaque(ctx, x, y, w, h, text, size, pal) {
   ctx.fillRect(x - w / 2 + 4, y + 4, w - 8, h - 8);
   ctx.fillStyle = LINE;
   ctx.font = `600 ${size}px Georgia, serif`;
-  // engraving must fit between the rivets — shrink the type, then truncate
+  // engraving must fit between the rivets — shrink a little, stay readable,
+  // and truncate whatever still doesn't fit
   const room = w - 34;
   const measured = ctx.measureText(text).width;
   if (measured > room) {
-    size = Math.max(8, Math.floor((size * room) / measured));
+    size = Math.max(12, Math.floor((size * room) / measured));
     ctx.font = `600 ${size}px Georgia, serif`;
-    while (ctx.measureText(text).width > room && text.length > 4) {
-      text = text.slice(0, -2).trimEnd() + "…";
+    // middle-ellipsis so near-identical names stay distinguishable
+    const original = text;
+    let keep = original.length;
+    while (ctx.measureText(text).width > room && keep > 5) {
+      keep -= 1;
+      const head = Math.ceil(keep * 0.6);
+      text = original.slice(0, head) + "…" + original.slice(original.length - (keep - head));
     }
   }
   ctx.textAlign = "center";

@@ -36,48 +36,52 @@ function env(a, gain, t0, attack, hold, release, peak) {
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + hold + release);
 }
 
-function noiseBuffer(a, seconds) {
+function noiseBuffer(a, seconds, white = false) {
   const buf = a.createBuffer(1, a.sampleRate * seconds, a.sampleRate);
   const d = buf.getChannelData(0);
   let last = 0;
   for (let i = 0; i < d.length; i++) {
-    // brown-ish noise: integrate white, keep bounded
-    last = (last + (Math.random() * 2 - 1) * 0.18) * 0.985;
-    d[i] = last * 2.4;
+    if (white) {
+      d[i] = Math.random() * 2 - 1;
+    } else {
+      // brown-ish noise: integrate white, keep bounded
+      last = (last + (Math.random() * 2 - 1) * 0.18) * 0.985;
+      d[i] = last * 2.4;
+    }
   }
   return buf;
 }
 
 export function purr() {
+  // source-filter purr: a 25Hz glottal pulse train rung through chest
+  // resonances, swelling and fading with a slow breath cycle
   const a = ac();
   if (!a) return;
   const t0 = a.currentTime;
-  const src = a.createBufferSource();
-  src.buffer = noiseBuffer(a, 2.6);
-  const lp = a.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 650; // high enough that laptop speakers carry it
-  const vca = a.createGain();
-  const lfo = a.createOscillator();
-  lfo.frequency.value = 24;
-  const lfoDepth = a.createGain();
-  lfoDepth.gain.value = 0.34;
-  lfo.connect(lfoDepth).connect(vca.gain);
   const out = a.createGain();
-  env(a, out, t0, 0.25, 1.6, 0.7, 0.9);
-  vca.gain.value = 0.45;
-  src.connect(lp).connect(vca).connect(out).connect(master);
-  const sub = a.createOscillator();
-  sub.frequency.value = 54;
-  const subGain = a.createGain();
-  env(a, subGain, t0, 0.3, 1.5, 0.7, 0.16);
-  sub.connect(subGain).connect(master);
-  src.start(t0);
-  sub.start(t0);
-  lfo.start(t0);
-  src.stop(t0 + 2.6);
-  sub.stop(t0 + 2.6);
-  lfo.stop(t0 + 2.6);
+  env(a, out, t0, 0.35, 1.6, 0.65, 1.0);
+  const breath = a.createOscillator();
+  breath.frequency.value = 0.75;
+  const breathDepth = a.createGain();
+  breathDepth.gain.value = 0.3;
+  breath.connect(breathDepth).connect(out.gain);
+  out.connect(master);
+  const pulses = a.createOscillator();
+  pulses.type = "sawtooth";
+  pulses.frequency.value = 25;
+  for (const [freq, q, g] of [[135, 2.2, 2.4], [310, 2.6, 1.0], [560, 3.0, 0.4]]) {
+    const bp = a.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = freq;
+    bp.Q.value = q;
+    const bg = a.createGain();
+    bg.gain.value = g;
+    pulses.connect(bp).connect(bg).connect(out);
+  }
+  pulses.start(t0);
+  breath.start(t0);
+  pulses.stop(t0 + 2.7);
+  breath.stop(t0 + 2.7);
 }
 
 export function mew() {
@@ -113,22 +117,32 @@ export function clank() {
 }
 
 export function woof() {
+  // two short barks: a fast-dropping pitched "oof" plus a breathy "wh"
   const a = ac();
   if (!a) return;
-  for (const dt of [0, 0.22]) {
-    const t0 = a.currentTime + dt;
-    const osc = a.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(150, t0);
-    osc.frequency.exponentialRampToValueAtTime(68, t0 + 0.13);
-    const lp = a.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 320;
-    const g = a.createGain();
-    env(a, g, t0, 0.012, 0.05, 0.1, 0.85);
-    osc.connect(lp).connect(g).connect(master);
-    osc.start(t0);
-    osc.stop(t0 + 0.25);
+  for (const [dt, fmul] of [[0, 1], [0.24, 0.93]]) {
+    const t0 = a.currentTime + 0.01 + dt;
+    for (const [type, f0, f1, p] of [["triangle", 250, 95, 0.9], ["sine", 135, 72, 0.7]]) {
+      const osc = a.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(f0 * fmul, t0);
+      osc.frequency.exponentialRampToValueAtTime(f1 * fmul, t0 + 0.085);
+      const g = a.createGain();
+      env(a, g, t0, 0.006, 0.025, 0.085, p);
+      osc.connect(g).connect(master);
+      osc.start(t0);
+      osc.stop(t0 + 0.16);
+    }
+    const n = a.createBufferSource();
+    n.buffer = noiseBuffer(a, 0.12, true);
+    const bp = a.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 950;
+    bp.Q.value = 0.8;
+    const ng = a.createGain();
+    env(a, ng, t0, 0.004, 0.02, 0.06, 0.4);
+    n.connect(bp).connect(ng).connect(master);
+    n.start(t0);
   }
 }
 
