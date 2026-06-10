@@ -174,8 +174,9 @@ function trigger(h) {
         vy: -1.5 - Math.random() * 2.5, a: 1, col: "255,155,60" });
     }
   } else if (h.act === "airdrop") {
+    // bubble goes under the gondola — above it would hide behind the masthead
     const ax = airshipX(nowT);
-    speak(ax + 20, AIRSHIP_Y - 60, "yip!");
+    speak(ax + 60, AIRSHIP_Y + 190, "yip!");
     sfx.yip();
     if (parcels.length < 3) {
       parcels.push({ x: ax + 6, y: AIRSHIP_Y + 90, vy: 0.3, ph: Math.random() * 7,
@@ -183,7 +184,7 @@ function trigger(h) {
     }
   } else if (h.act === "whistle") {
     fx.whistle = nowT + 2400;
-    speak(WHISTLE.x - 30, WHISTLE.y - 120, "TOOOOT!");
+    speak(WHISTLE.x + 160, WHISTLE.y + 10, "TOOOOT!");
     sfx.toot();
   } else if (h.act === "telegraph") {
     fx.telegraph = nowT + 3200;

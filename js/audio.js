@@ -10,7 +10,7 @@ function ac() {
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain();
-      master.gain.value = muted ? 0 : 0.22;
+      master.gain.value = muted ? 0 : 0.4;
       master.connect(ctx.destination);
     }
     if (ctx.state === "suspended") ctx.resume();
@@ -22,7 +22,7 @@ function ac() {
 
 export function setMuted(m) {
   muted = m;
-  if (master) master.gain.value = m ? 0 : 0.22;
+  if (master) master.gain.value = m ? 0 : 0.4;
 }
 
 export function isMuted() {
@@ -56,26 +56,28 @@ export function purr() {
   src.buffer = noiseBuffer(a, 2.6);
   const lp = a.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 380;
+  lp.frequency.value = 650; // high enough that laptop speakers carry it
   const vca = a.createGain();
   const lfo = a.createOscillator();
   lfo.frequency.value = 24;
   const lfoDepth = a.createGain();
-  lfoDepth.gain.value = 0.32;
+  lfoDepth.gain.value = 0.34;
   lfo.connect(lfoDepth).connect(vca.gain);
   const out = a.createGain();
-  env(a, out, t0, 0.25, 1.6, 0.7, 0.8);
+  env(a, out, t0, 0.25, 1.6, 0.7, 0.9);
   vca.gain.value = 0.45;
   src.connect(lp).connect(vca).connect(out).connect(master);
   const sub = a.createOscillator();
-  sub.frequency.value = 27;
+  sub.frequency.value = 54;
   const subGain = a.createGain();
-  env(a, subGain, t0, 0.3, 1.5, 0.7, 0.18);
+  env(a, subGain, t0, 0.3, 1.5, 0.7, 0.16);
   sub.connect(subGain).connect(master);
   src.start(t0);
   sub.start(t0);
+  lfo.start(t0);
   src.stop(t0 + 2.6);
   sub.stop(t0 + 2.6);
+  lfo.stop(t0 + 2.6);
 }
 
 export function mew() {
