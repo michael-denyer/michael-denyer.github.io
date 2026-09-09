@@ -14,6 +14,8 @@ a steampunk workshop run by cats, powered by commits.
   follows `prefers-color-scheme`.
 - Illustrated Victorian engine-room architecture, copper boilers with lit
   water levels, engraved brass gears, a moving crank, and a caged firebox.
+- Shaded animal crew with blinking eyes, whiskers, leather work aprons,
+  brass goggles, a waistcoat and watch chain, and an aviator helmet.
 - Pause the machinery with the Motion button. The workshop starts paused
   when `prefers-reduced-motion` is enabled.
 - On phones, use the workshop slider to reach the furnace and boiler bank.
