@@ -3,15 +3,37 @@
 
 export const LINE = "#241c14";
 
+// Shared metal finish keeps the moving machinery in the same light.
+export function metal(ctx, x, y, w, h, dark, mid, light) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, dark);
+  g.addColorStop(0.22, mid);
+  g.addColorStop(0.38, light);
+  g.addColorStop(0.5, mid);
+  g.addColorStop(0.82, dark);
+  g.addColorStop(1, mid);
+  return g;
+}
+
 export function rivet(ctx, x, y, r = 4) {
-  ctx.fillStyle = "#4e4a44";
+  ctx.fillStyle = "#21170f";
+  ctx.beginPath();
+  ctx.arc(x + 1, y + 1, r + 1, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = "#897044";
   ctx.beginPath();
   ctx.arc(x, y, r, 0, 7);
   ctx.fill();
-  ctx.fillStyle = "#7a746a";
+  ctx.fillStyle = "#e4c78a";
   ctx.beginPath();
   ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.35, 0, 7);
   ctx.fill();
+  ctx.strokeStyle = "#43331e";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.48, y + r * 0.48);
+  ctx.lineTo(x + r * 0.48, y - r * 0.48);
+  ctx.stroke();
 }
 
 export function gear(ctx, x, y, r, teeth, ang, col, dark, holeColor) {
@@ -26,7 +48,8 @@ export function gear(ctx, x, y, r, teeth, ang, col, dark, holeColor) {
     ctx.fillRect(r - 4, -tw / 2, tw * 0.9 + 8, tw);
     ctx.restore();
   }
-  ctx.fillStyle = col;
+  const finish = metal(ctx, -r, -r, r * 2, r * 2, dark, col, col);
+  ctx.fillStyle = finish;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, 7);
   ctx.fill();
@@ -34,7 +57,14 @@ export function gear(ctx, x, y, r, teeth, ang, col, dark, holeColor) {
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.62, 0, 7);
   ctx.fill();
-  ctx.fillStyle = col;
+  ctx.strokeStyle = "rgba(255,225,166,0.28)";
+  ctx.lineWidth = Math.max(1, r * 0.012);
+  for (const radius of [0.68, 0.94]) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * radius, 0, 7);
+    ctx.stroke();
+  }
+  ctx.fillStyle = finish;
   for (let i = 0; i < 5; i++) {
     ctx.save();
     ctx.rotate((i / 5) * Math.PI * 2);
@@ -48,19 +78,32 @@ export function gear(ctx, x, y, r, teeth, ang, col, dark, holeColor) {
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.08, 0, 7);
   ctx.fill();
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5;
+    rivet(ctx, Math.sin(a) * r * 0.79, Math.cos(a) * r * 0.79, Math.max(2, r * 0.022));
+  }
   ctx.restore();
 }
 
 export function gauge(ctx, x, y, r, val, label, wob, pal) {
-  ctx.fillStyle = pal.brassDark;
+  ctx.save();
+  ctx.fillStyle = "#17120e";
+  ctx.beginPath();
+  ctx.arc(x + 2, y + 5, r * 1.17, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = metal(ctx, x - r, y - r, r * 2, r * 2, pal.brassDark, pal.brass, pal.brassLight);
   ctx.beginPath();
   ctx.arc(x, y, r + r * 0.12, 0, 7);
   ctx.fill();
-  ctx.fillStyle = pal.brass;
+  ctx.fillStyle = "#34271c";
   ctx.beginPath();
   ctx.arc(x, y, r + r * 0.06, 0, 7);
   ctx.fill();
-  ctx.fillStyle = pal.gaugeFace;
+  const face = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 0, x, y, r);
+  face.addColorStop(0, "#fff1cf");
+  face.addColorStop(0.75, pal.gaugeFace);
+  face.addColorStop(1, "#b29b6b");
+  ctx.fillStyle = face;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, 7);
   ctx.fill();
@@ -72,12 +115,21 @@ export function gauge(ctx, x, y, r, val, label, wob, pal) {
   ctx.stroke();
   ctx.strokeStyle = LINE;
   ctx.lineWidth = Math.max(1.2, r * 0.022);
-  for (let i = 0; i <= 10; i++) {
-    const a = a0 + (sweep * i) / 10;
+  for (let i = 0; i <= 40; i++) {
+    const a = a0 + (sweep * i) / 40;
+    const inner = i % 4 === 0 ? 0.72 : 0.81;
     ctx.beginPath();
-    ctx.moveTo(x + Math.cos(a) * r * 0.72, y + Math.sin(a) * r * 0.72);
+    ctx.moveTo(x + Math.cos(a) * r * inner, y + Math.sin(a) * r * inner);
     ctx.lineTo(x + Math.cos(a) * r * 0.87, y + Math.sin(a) * r * 0.87);
     ctx.stroke();
+  }
+  ctx.fillStyle = LINE;
+  ctx.font = `${Math.round(r * 0.16)}px Georgia, serif`;
+  ctx.textAlign = "center";
+  for (let i = 0; i <= 5; i++) {
+    if (label && (i === 0 || i === 5)) continue;
+    const a = a0 + sweep * i / 5;
+    ctx.fillText(String(i * 20), x + Math.cos(a) * r * 0.58, y + Math.sin(a) * r * 0.58 + r * 0.05);
   }
   const na = a0 + sweep * Math.max(0, Math.min(1, val)) + wob;
   ctx.strokeStyle = "#8a2222";
@@ -93,17 +145,26 @@ export function gauge(ctx, x, y, r, val, label, wob, pal) {
   ctx.fill();
   if (label) {
     ctx.fillStyle = LINE;
-    ctx.font = `600 ${Math.round(r * 0.2)}px Georgia, serif`;
+    ctx.font = `600 ${Math.round(r * 0.16)}px Georgia, serif`;
     ctx.textAlign = "center";
-    ctx.fillText(label, x, y + r * 0.48);
+    ctx.fillText(label, x, y + r * 0.44);
   }
+  ctx.strokeStyle = "rgba(255,255,240,0.55)";
+  ctx.lineWidth = Math.max(1.5, r * 0.04);
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.94, Math.PI * 1.13, Math.PI * 1.82);
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function plaque(ctx, x, y, w, h, text, size, pal) {
   ctx.fillStyle = pal.brassDark;
   ctx.fillRect(x - w / 2, y, w, h);
-  ctx.fillStyle = pal.brass;
+  ctx.fillStyle = metal(ctx, x - w / 2, y, w, h, pal.brassDark, pal.brass, pal.brassLight);
   ctx.fillRect(x - w / 2 + 4, y + 4, w - 8, h - 8);
+  ctx.strokeStyle = "rgba(255,234,183,0.4)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - w / 2 + 6, y + 6, w - 12, h - 12);
   ctx.fillStyle = LINE;
   ctx.font = `600 ${size}px Georgia, serif`;
   // engraving must fit between the rivets — shrink a little, stay readable,
@@ -130,17 +191,21 @@ export function plaque(ctx, x, y, w, h, text, size, pal) {
 
 export function boiler(ctx, x, y, w, h, name, pressure, t, pal) {
   // x,y = top-left of the cylinder body
-  ctx.fillStyle = pal.copperDark;
+  const shell = metal(ctx, x, y, w, 0, pal.copperDark, pal.copper, pal.copperLight);
+  ctx.fillStyle = shell;
   ctx.beginPath();
   ctx.arc(x + w / 2, y, w / 2, Math.PI, 0);
   ctx.fill();
-  ctx.fillStyle = pal.copper;
+  ctx.fillStyle = shell;
   ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = pal.copperLight;
-  ctx.fillRect(x, y, w * 0.18, h);
+  ctx.strokeStyle = "rgba(248,205,142,0.15)";
+  ctx.lineWidth = 1;
+  for (let sy = y + 8; sy < y + h; sy += 7) {
+    ctx.beginPath(); ctx.moveTo(x + 5, sy); ctx.lineTo(x + w - 5, sy); ctx.stroke();
+  }
   for (let by = y + 56; by < y + h; by += 88) {
-    ctx.fillStyle = pal.copperDark;
-    ctx.fillRect(x, by, w, 10);
+    ctx.fillStyle = metal(ctx, x, by, w, 0, pal.brassDark, pal.brass, pal.brassLight);
+    ctx.fillRect(x - 3, by, w + 6, 12);
     rivet(ctx, x + 13, by + 5);
     rivet(ctx, x + w / 2, by + 5);
     rivet(ctx, x + w - 13, by + 5);
@@ -152,6 +217,30 @@ export function boiler(ctx, x, y, w, h, name, pressure, t, pal) {
   ctx.fillRect(x + w / 2 - 13, y - w / 2 - 34, 26, 8);
   gauge(ctx, x + w / 2, y + 120, w * 0.27, pressure, "", Math.sin(t * 0.005 + x) * 0.04 * (0.3 + pressure), pal);
   plaque(ctx, x + w / 2, y + 190, w + 14, 34, name.toUpperCase(), 15, pal);
+  // Backlit water level, inspection hatch and bolted mounting feet.
+  const levelY = y + 256;
+  ctx.fillStyle = "#231c16";
+  ctx.fillRect(x + 24, levelY, 22, 112);
+  ctx.fillStyle = pal.aetherDim;
+  ctx.fillRect(x + 29, levelY + 5, 12, 102);
+  ctx.fillStyle = pal.aether;
+  ctx.fillRect(x + 29, levelY + 102 - pressure * 90, 12, 5 + pressure * 90);
+  ctx.fillStyle = "rgba(255,255,232,0.6)";
+  ctx.fillRect(x + 31, levelY + 8, 2, 95);
+  for (let mark = 0; mark < 6; mark++) {
+    ctx.fillStyle = pal.brassLight;
+    ctx.fillRect(x + 44, levelY + 10 + mark * 18, 8, 1);
+  }
+  for (const capY of [levelY - 4, levelY + 108]) {
+    ctx.fillStyle = pal.brass;
+    ctx.fillRect(x + 22, capY, 26, 8);
+  }
+  gear(ctx, x + w * 0.69, levelY + 55, 29, 8, 0.3, pal.brass, pal.brassDark, pal.copperDark);
+  for (const footX of [x + 6, x + w - 32]) {
+    ctx.fillStyle = pal.ironGearDark;
+    ctx.fillRect(footX, y + h - 24, 26, 30);
+    rivet(ctx, footX + 13, y + h - 9, 4);
+  }
 }
 
 export function aetherTube(ctx, pts, t, pal, pulseCount = 3) {
@@ -576,7 +665,7 @@ export function airship(ctx, t, banner, pal) {
   ctx.fillText(banner, -bw / 2, 6);
   ctx.restore();
   // balloon
-  ctx.fillStyle = pal.balloon;
+  ctx.fillStyle = metal(ctx, -30, -38, 20, 76, pal.balloonDark, pal.balloon, pal.brassLight);
   ctx.beginPath();
   ctx.ellipse(0, 0, 100, 38, 0, 0, 7);
   ctx.fill();

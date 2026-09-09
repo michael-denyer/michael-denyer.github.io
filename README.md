@@ -12,6 +12,12 @@ a steampunk workshop run by cats, powered by commits.
 - Mouse parallax across five depth layers; every cat's eyes follow the cursor.
 - Click near a boiler to vent steam. The ◐ valve flips day/night; it otherwise
   follows `prefers-color-scheme`.
+- Illustrated Victorian engine-room architecture, copper boilers with lit
+  water levels, engraved brass gears, a moving crank, and a caged firebox.
+- Pause the machinery with the Motion button. The workshop starts paused
+  when `prefers-reduced-motion` is enabled.
+- On phones, use the workshop slider to reach the furnace and boiler bank.
+  Touches use their own coordinates, so the crew respond without mouse movement.
 
 ## Stack
 
@@ -24,4 +30,9 @@ style.css       brass plaque chrome
 js/main.js      scene, layers, loop, input, palettes
 js/sprites.js   canvas draw functions (cats, dog, airship, gears, gauges)
 js/data.js      live GitHub data with fallbacks
+assets/         compressed engine-room backdrop and its generation brief
 ```
+
+The backdrop is a locally served 351 KiB WebP. If it cannot load, the
+procedural wall and gears still render. The scene has no new runtime
+dependencies or build step.
