@@ -15,7 +15,8 @@ export const crew = {
   sleeper: {
     scale:0.19, phase:1400,
     origins:[[256,420],[256,421],[256,422],[256,389],[256,390],[256,390]],
-    poses:[0,1,2,3,4,5,0], durations:[3200,360,430,380,320,420,1800],
+    // Rest on the paws, with one brief ear twitch between long sleeping holds.
+    poses:[0,1,0], durations:[5600,220,1800],
   },
   kitten: {
     scale:0.205, phase:0,
@@ -66,7 +67,7 @@ export function loadCrew(onLoad) {
     const sheet = {image, ready:false, elapsed:0};
     sheets.set(name, sheet);
     image.addEventListener("load", () => { sheet.ready = true; onLoad(); });
-    image.src = new URL(`../assets/crew/${name}.webp`, import.meta.url).href;
+    image.src = new URL(`../assets/crew/${name}.webp?v=1424d2a11c5c`, import.meta.url).href;
   }
 }
 

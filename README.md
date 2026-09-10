@@ -9,7 +9,7 @@ a steampunk workshop run by cats, powered by commits.
   commit telegraph ticker all read live GitHub data client-side (unauthenticated
   API + the profile repo's rendered café SVG), with baked fallbacks so the
   workshop never goes dark.
-- Mouse parallax across five depth layers; every cat's eyes follow the cursor.
+- Mouse parallax across five depth layers.
 - Click near a boiler to vent steam. The ◐ valve flips day/night; it otherwise
   follows `prefers-color-scheme`.
 - Illustrated Victorian engine-room architecture, copper boilers with lit
@@ -47,3 +47,9 @@ available. There are no runtime package dependencies or build steps.
 For an enlarged animation study with playback controls, open
 `/scripts/crew-preview.html` on the local server. Run
 `node scripts/check-crew.mjs` to check chase continuity, turning, and pause.
+
+Before publishing edits, run `node scripts/version-assets.mjs`. It derives a
+release ID from the site contents and updates every local script, stylesheet,
+and image URL together. `node scripts/version-assets.mjs --check` verifies
+that the URLs match the current files. The release ID is also recorded in
+the page's `aether-release` meta tag for checking which version loaded.
