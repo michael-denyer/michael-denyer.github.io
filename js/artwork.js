@@ -1,6 +1,6 @@
 // Painted sprite atlases load independently; the procedural sprites remain
 // available if an image is missing or the connection is offline.
-import { loadCrew, hasCrew, animateCrew, drawCrew, crew } from "./crew-animation.js?v=1424d2a11c5c";
+import { loadCrew, hasCrew, animateCrew, drawCrew, crew } from "./crew-animation.js?v=1bdbbf4855e6";
 
 const sheets = new Map();
 const frames = {
@@ -23,7 +23,7 @@ export function loadArtwork(onLoad) {
       sheet.ready = true;
       onLoad();
     });
-    image.src = new URL(`../assets/${name}-atlas.webp?v=1424d2a11c5c`, import.meta.url).href;
+    image.src = new URL(`../assets/${name}-atlas.webp?v=1bdbbf4855e6`, import.meta.url).href;
   }
 }
 

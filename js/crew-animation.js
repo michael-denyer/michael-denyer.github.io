@@ -8,9 +8,10 @@ export const crew = {
     poses:[0,1,2,1,0,3,5], durations:[550,130,340,130,300,140,500],
   },
   operator: {
-    scale:0.235, phase:450,
-    origins:[[310,494],[299,494],[307,494],[321,480],[311,480],[309,480]],
-    poses:[0,1,2,3,2,1,4,5], durations:[400,100,170,180,130,100,130,450],
+    scale:0.235, phase:0,
+    origins:[[363,468],[365,472],[366,475],[363,453],[359,451],[364,452]],
+    // Two short key presses, then a pause with the paw held below the muzzle.
+    poses:[1,2,1,2,1,0,1], durations:[650,120,150,160,400,500,350],
   },
   sleeper: {
     scale:0.19, phase:1400,
@@ -67,7 +68,7 @@ export function loadCrew(onLoad) {
     const sheet = {image, ready:false, elapsed:0};
     sheets.set(name, sheet);
     image.addEventListener("load", () => { sheet.ready = true; onLoad(); });
-    image.src = new URL(`../assets/crew/${name}.webp?v=1424d2a11c5c`, import.meta.url).href;
+    image.src = new URL(`../assets/crew/${name}.webp?v=1bdbbf4855e6`, import.meta.url).href;
   }
 }
 

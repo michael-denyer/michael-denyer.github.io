@@ -1,22 +1,16 @@
-// Live GitHub data with baked fallbacks. All endpoints are unauthenticated
-// and CORS-friendly; failures fall back silently so the scene never breaks.
-
+// Public GitHub activity. Failed refreshes retain the last successful values.
 const USER = "michael-denyer";
 
 export const fallback = {
   boilers: [
-    { name: "michael-denyer", pressure: 0.9 },
-    { name: "pstack-claude", pressure: 0.65 },
-    { name: "jamma", pressure: 0.45 },
+    { name: "michael-denyer", pressure: 0.15 },
+    { name: "michael-denyer.github.io", pressure: 0.15 },
+    { name: "jamma", pressure: 0.15 },
   ],
-  totalStars: 8,
-  openPrs: 2,
-  streakDays: 10,
-  ticker: [
-    "feat: star-scaled cats, broken-streak stares, octocat portrait",
-    "feat: commit cafe workflow replaces snake",
-    "feat: GitHub API collector with streak computation",
-  ],
+  totalStars: null,
+  openPrs: null,
+  streakDays: null,
+  ticker: ["Public GitHub activity unavailable"],
 };
 
 function pressureFromPushed(pushedAt) {
@@ -27,55 +21,57 @@ function pressureFromPushed(pushedAt) {
   return 0.15;
 }
 
-export async function fetchLive() {
-  const live = structuredClone(fallback);
-  const results = await Promise.allSettled([
-    fetch(`https://api.github.com/users/${USER}/repos?sort=pushed&per_page=30`),
-    fetch(`https://api.github.com/search/issues?q=is:pr+is:open+user:${USER}`),
-    fetch(`https://api.github.com/users/${USER}/events/public?per_page=30`),
-    fetch(`https://raw.githubusercontent.com/${USER}/${USER}/output/cafe-day.svg`),
+async function request(url, format = "json") {
+  const response = await fetch(url, {cache: "no-store", credentials: "omit", signal: AbortSignal.timeout(10000)});
+  if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+  return format === "text" ? response.text() : response.json();
+}
+
+export async function fetchLive(previous = fallback) {
+  const live = structuredClone(previous);
+  const [reposResult, prsResult, streakResult] = await Promise.allSettled([
+    request(`https://api.github.com/users/${USER}/repos?sort=pushed&per_page=30&type=owner`),
+    request(`https://api.github.com/search/issues?q=is:pr+is:open+is:public+user:${USER}`),
+    request(`https://raw.githubusercontent.com/${USER}/${USER}/output/cafe-day.svg`, "text"),
   ]);
 
-  try {
-    if (results[0].status === "fulfilled" && results[0].value.ok) {
-      const repos = (await results[0].value.json()).filter((r) => !r.fork && !r.private);
-      live.boilers = repos.slice(0, 3).map((r) => ({
-        name: r.name,
-        pressure: pressureFromPushed(r.pushed_at),
-      }));
-      live.totalStars = repos.reduce((s, r) => s + r.stargazers_count, 0);
-    }
-  } catch { /* keep fallback */ }
+  if (prsResult.status === "fulfilled" && Number.isInteger(prsResult.value?.total_count) && prsResult.value.total_count >= 0) {
+    live.openPrs = prsResult.value.total_count;
+  }
+  if (streakResult.status === "fulfilled") {
+    const match = streakResult.value.match(/(\d+) days? of kibble/);
+    if (match) live.streakDays = Number(match[1]);
+    else if (streakResult.value.includes("bowl empty")) live.streakDays = 0;
+  }
 
-  try {
-    if (results[1].status === "fulfilled" && results[1].value.ok) {
-      live.openPrs = (await results[1].value.json()).total_count ?? live.openPrs;
+  if (reposResult.status === "fulfilled" && Array.isArray(reposResult.value)) {
+    // Only explicitly public repositories may supply names or commit messages.
+    const repos = reposResult.value.filter(r => r?.visibility === "public" && r.private === false && !r.fork && typeof r.name === "string");
+    const recent = repos.slice(0, 3);
+    if (recent.length) {
+      live.boilers = recent.map(r => ({name: r.name, pressure: pressureFromPushed(r.pushed_at)}));
+      live.totalStars = repos.reduce((sum, r) => sum + (Number.isFinite(r.stargazers_count) ? r.stargazers_count : 0), 0);
     }
-  } catch { /* keep fallback */ }
-
-  try {
-    if (results[2].status === "fulfilled" && results[2].value.ok) {
-      const events = await results[2].value.json();
-      const msgs = [];
-      for (const ev of events) {
-        if (ev.type === "PushEvent") {
-          for (const c of ev.payload.commits ?? []) {
-            msgs.push(`${ev.repo.name.split("/")[1]}: ${c.message.split("\n")[0]}`);
-          }
-        }
+    // PushEvent no longer contains commit summaries. Read the commits themselves.
+    const results = await Promise.allSettled(recent.map(r =>
+      request(`https://api.github.com/repos/${USER}/${encodeURIComponent(r.name)}/commits?per_page=3`)));
+    const commits = [];
+    for (const [index, result] of results.entries()) {
+      if (result.status !== "fulfilled" || !Array.isArray(result.value)) continue;
+      for (const entry of result.value) {
+        const message = entry?.commit?.message;
+        const date = Date.parse(entry?.commit?.committer?.date);
+        if (typeof message !== "string" || !Number.isFinite(date) || typeof entry.sha !== "string") continue;
+        commits.push({sha: entry.sha, date, text: `${recent[index].name}: ${message.split("\n")[0].slice(0, 300)}`});
       }
-      if (msgs.length) live.ticker = msgs.slice(0, 8);
     }
-  } catch { /* keep fallback */ }
-
-  try {
-    if (results[3].status === "fulfilled" && results[3].value.ok) {
-      const svg = await results[3].value.text();
-      const m = svg.match(/(\d+) days? of kibble/);
-      if (m) live.streakDays = parseInt(m[1], 10);
-      else if (svg.includes("bowl empty")) live.streakDays = 0;
-    }
-  } catch { /* keep fallback */ }
-
+    const seen = new Set();
+    const messages = commits.sort((a, b) => b.date - a.date).filter(commit => {
+      if (seen.has(commit.sha)) return false;
+      seen.add(commit.sha);
+      return true;
+    }).slice(0, 8).map(commit => commit.text);
+    if (messages.length) live.ticker = messages;
+  }
   return live;
 }

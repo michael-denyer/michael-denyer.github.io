@@ -23,7 +23,7 @@ try {
   assert.equal(run().status,0);
   const after = await release();
   assert.notEqual(after,before);
-  for (const name of ['index.html','js/main.js','js/sprites.js','js/artwork.js','js/crew-animation.js','scripts/crew-preview.html']) {
+  for (const name of ['index.html','js/main.js','js/audio.js','js/sprites.js','js/artwork.js','js/crew-animation.js','scripts/crew-preview.html']) {
     const text = await readFile(path.join(fixture,name),'utf8');
     assert.ok(text.includes(`?v=${after}`),`${name} uses the new release`);
     assert.ok(!text.includes(`?v=${before}`),`${name} has no stale references`);
@@ -31,7 +31,13 @@ try {
   assert.equal(run('--check').status,0);
   assert.equal(run().status,0);
   assert.equal(await release(),after,'Stamping unchanged files is idempotent');
-  console.log('PASS: nested edits invalidate the complete asset graph; stamping is idempotent');
+  await appendFile(path.join(fixture,'assets/audio/dog-bark.wav'), Buffer.from([0,0]));
+  assert.equal(run('--check').status,1,'A changed recording also invalidates the release');
+  assert.equal(run().status,0);
+  const audioRelease = await release();
+  assert.notEqual(audioRelease,after);
+  assert.ok((await readFile(path.join(fixture,'js/audio.js'),'utf8')).includes(`dog-bark.wav?v=${audioRelease}`));
+  console.log('PASS: nested code and audio edits invalidate the complete asset graph; stamping is idempotent');
 } finally {
   await rm(fixture,{recursive:true,force:true});
 }
