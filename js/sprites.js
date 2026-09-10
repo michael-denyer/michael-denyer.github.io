@@ -1,6 +1,6 @@
 // Canvas draw functions for the Aether Works scene.
 // All sprites draw at a local origin; callers translate/scale the context.
-import { hasArtwork, paint, paintCrew } from "./artwork.js";
+import { hasArtwork, paint, paintCrew } from "./artwork.js?v=1424d2a11c5c";
 
 export const LINE = "#241c14";
 

@@ -1,8 +1,8 @@
-import * as S from "./sprites.js";
-import * as sfx from "./audio.js";
-import { fallback, fetchLive } from "./data.js";
-import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js";
-import { advanceChase } from "./crew-animation.js";
+import * as S from "./sprites.js?v=1424d2a11c5c";
+import * as sfx from "./audio.js?v=1424d2a11c5c";
+import { fallback, fetchLive } from "./data.js?v=1424d2a11c5c";
+import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js?v=1424d2a11c5c";
+import { advanceChase } from "./crew-animation.js?v=1424d2a11c5c";
 
 const W = 1920, H = 1080;
 const canvas = document.getElementById("scene");
@@ -10,7 +10,7 @@ const ctx = canvas.getContext("2d");
 const backdrop = new Image();
 let backdropReady = false;
 backdrop.addEventListener("load", () => { backdropReady = true; requestFrame(); });
-backdrop.src = new URL("../assets/engine-room.webp", import.meta.url).href;
+backdrop.src = new URL("../assets/engine-room.webp?v=1424d2a11c5c", import.meta.url).href;
 
 const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
 let motionPaused = motionPreference.matches;
