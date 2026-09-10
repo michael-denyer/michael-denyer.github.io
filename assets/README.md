@@ -19,3 +19,16 @@ Color palette: Jewel teal, charcoal brown, warm amber brass.
 Materials/textures: Aged copper patina, engraved brass, riveted cast iron, subtle old brick and dark wood.
 Constraints: Exactly one image. No characters, cats, people, text, lettering, UI, logos, or watermark.
 ```
+
+## Painted foreground
+
+`machinery-atlas.webp` and `crew-atlas.webp` were generated with the built-in
+imagegen tool using the engine-room backdrop as a style reference. Both are
+1536 by 1024 pixels. The exact generation prompts are in
+`foreground-prompts.json`. Sprite bounds are recorded in `js/artwork.js`.
+
+The machinery image has native transparency. The crew image's neutral
+checkerboard was removed programmatically with user authorization, preserving
+colored fur and enclosed highlights. Both atlases retain an alpha channel.
+The crew is animated at runtime by `js/crew-rig.js`; the atlas stores neutral
+poses, while the shader articulates limbs and expressions.

@@ -1,5 +1,6 @@
 // Canvas draw functions for the Aether Works scene.
 // All sprites draw at a local origin; callers translate/scale the context.
+import { hasArtwork, paint, paintCrew } from "./artwork.js";
 
 export const LINE = "#241c14";
 
@@ -37,6 +38,12 @@ export function rivet(ctx, x, y, r = 4) {
 }
 
 export function gear(ctx, x, y, r, teeth, ang, col, dark, holeColor) {
+  if (hasArtwork("flywheel")) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    paint(ctx, "flywheel", -r, -r, r * 2, r * 2);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(ang);
@@ -250,13 +257,22 @@ export function aetherTube(ctx, pts, t, pal, pulseCount = 3) {
   const path = new Path2D();
   path.moveTo(pts[0][0], pts[0][1]);
   for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1]);
-  ctx.strokeStyle = pal.tubeCasing;
-  ctx.lineWidth = 14;
+  ctx.strokeStyle = "#171d18";
+  ctx.lineWidth = 19;
+  ctx.stroke(path);
+  ctx.strokeStyle = "#80643b";
+  ctx.lineWidth = 13;
+  ctx.stroke(path);
+  ctx.strokeStyle = "#b69b64";
+  ctx.lineWidth = 9;
+  ctx.stroke(path);
+  ctx.strokeStyle = "#203d36";
+  ctx.lineWidth = 6;
   ctx.stroke(path);
   ctx.strokeStyle = pal.aetherDim;
-  ctx.lineWidth = 7;
+  ctx.lineWidth = 3;
   ctx.shadowColor = pal.aether;
-  ctx.shadowBlur = pal.aetherGlow;
+  ctx.shadowBlur = pal.aetherGlow * 0.35;
   ctx.stroke(path);
   ctx.shadowBlur = 0;
   // segment lengths for pulse travel
@@ -276,18 +292,19 @@ export function aetherTube(ctx, pts, t, pal, pulseCount = 3) {
     const py = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f;
     ctx.fillStyle = pal.aetherBright;
     ctx.shadowColor = pal.aether;
-    ctx.shadowBlur = 18;
+    ctx.shadowBlur = 7;
     ctx.beginPath();
-    ctx.arc(px, py, 5, 0, 7);
+    ctx.arc(px, py, 2.5, 0, 7);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
   // junction collars
   for (let i = 1; i < pts.length - 1; i++) {
     ctx.fillStyle = pal.brassDark;
-    ctx.fillRect(pts[i][0] - 9, pts[i][1] - 9, 18, 18);
-    ctx.fillStyle = pal.brass;
-    ctx.fillRect(pts[i][0] - 6, pts[i][1] - 6, 12, 12);
+    ctx.beginPath(); ctx.arc(pts[i][0], pts[i][1], 12, 0, 7); ctx.fill();
+    ctx.fillStyle = metal(ctx, pts[i][0] - 10, pts[i][1] - 10, 20, 20, pal.brassDark, pal.brass, pal.brassLight);
+    ctx.beginPath(); ctx.arc(pts[i][0], pts[i][1], 9, 0, 7); ctx.fill();
+    rivet(ctx, pts[i][0], pts[i][1], 4);
   }
   ctx.restore();
 }
@@ -470,6 +487,7 @@ function catHead(ctx, col, cream, look, pal, t, ph, withGoggles = true) {
 }
 
 export function catSit(ctx, col, shade, t, ph, look, pal, withGoggles = true) {
+  if (paintCrew(ctx, "engineer", t, look, ph)) return;
   ctx.save();
   const sw = Math.sin(t * 0.0025 + ph);
   oval(ctx, 3, 1, 35, 5, "rgba(10,17,13,0.3)");
@@ -497,6 +515,7 @@ export function catSit(ctx, col, shade, t, ph, look, pal, withGoggles = true) {
 }
 
 export function catCurl(ctx, col, shade, t, ph) {
+  if (paintCrew(ctx, "sleeper", t, {}, ph)) return;
   ctx.save();
   ctx.scale(1, 1 + 0.025 * Math.sin(t * 0.0018 + ph));
   oval(ctx, 0, 1, 42, 4, "rgba(10,17,13,0.25)");
@@ -517,6 +536,11 @@ export function catCurl(ctx, col, shade, t, ph) {
 }
 
 export function catRun(ctx, col, patch, t, dir, look, pal) {
+  if (hasArtwork("kitten")) {
+    ctx.save(); ctx.scale(dir, 1);
+    paintCrew(ctx, "kitten", t, {...look, x:look.x * dir});
+    ctx.restore(); return;
+  }
   ctx.save();
   ctx.scale(dir, 1);
   const run = Math.sin(t * 0.02);
@@ -541,6 +565,12 @@ export function catRun(ctx, col, patch, t, dir, look, pal) {
 }
 
 export function catOperator(ctx, col, shade, t, ph, look, pal, tapBoost = 1) {
+  if (hasArtwork("operator")) {
+    ctx.save();
+    ctx.rotate(Math.max(0, Math.sin(t * 0.012 * tapBoost + ph)) * 0.025);
+    paintCrew(ctx, "operator", t, look, ph);
+    ctx.restore(); return;
+  }
   ctx.save();
   const tap = Math.max(0, Math.sin(t * 0.012 * tapBoost + ph)) * 8;
   const sw = Math.sin(t * 0.002 + ph);
@@ -572,6 +602,11 @@ export function catOperator(ctx, col, shade, t, ph, look, pal, tapBoost = 1) {
 // Wall-mounted steam whistle with a pull cord. Origin: bracket center.
 // yank 0..1 pulls the cord and tilts the bell.
 export function steamWhistle(ctx, t, yank, pal) {
+  if (hasArtwork("whistle")) {
+    ctx.save(); ctx.rotate(yank * 0.07);
+    paint(ctx, "whistle", -25, -98, 50, 100);
+    ctx.restore();
+  } else {
   ctx.fillStyle = pal.brassDark;
   ctx.fillRect(-10, -8, 20, 46);
   rivet(ctx, 0, 30, 3.5);
@@ -589,6 +624,7 @@ export function steamWhistle(ctx, t, yank, pal) {
   ctx.fillStyle = pal.brassDark;
   ctx.fillRect(-16, -56, 32, 7);
   ctx.restore();
+  }
   const cordLen = 58 + yank * 22;
   const swing = yank > 0 ? 0 : Math.sin(t * 0.0016) * 5;
   ctx.strokeStyle = "#8a6d2f";
@@ -606,6 +642,11 @@ export function steamWhistle(ctx, t, yank, pal) {
 
 // Bulldog stoker, with a leather apron and articulated shovel arm.
 export function dogStoker(ctx, t, pal) {
+  if (hasArtwork("stoker")) {
+    ctx.save(); ctx.rotate(Math.sin(t * 0.004) * 0.045);
+    paintCrew(ctx, "stoker", t);
+    ctx.restore(); return;
+  }
   ctx.save();
   const cyc = Math.sin(t * 0.004);
   const shovelAng = -0.5 + cyc * 0.45;
@@ -675,6 +716,10 @@ export function dogStoker(ctx, t, pal) {
 }
 
 function dogPilot(ctx, t) {
+  if (hasArtwork("pilot")) {
+    ctx.save(); ctx.translate(6, 70); paintCrew(ctx, "pilot", t); ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(6, 46);
   oval(ctx, 0, 2, 15, 16, fur(ctx, -3, -3, 19, "#c49c71"));
@@ -718,6 +763,20 @@ export function airship(ctx, t, banner, pal) {
   ctx.textAlign = "center";
   ctx.fillText(banner, -bw / 2, 6);
   ctx.restore();
+  if (hasArtwork("airship")) {
+    const ship = paint(ctx, "airship", -150, -75, 300, 180);
+    ctx.save();
+    ctx.translate(ship.x + ship.w * 0.527, ship.y + ship.h * 0.67);
+    ctx.scale(0.6, 0.6);
+    if (!paintCrew(ctx, "pilot", t)) {
+      ctx.translate(-6, -70); dogPilot(ctx, t);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(177,141,79,0.6)";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(-137, -11, 3, 31 * Math.sin(t * 0.035) ** 2 + 2, 0, 0, 7); ctx.stroke();
+    ctx.restore(); return;
+  }
   // balloon
   ctx.fillStyle = metal(ctx, -30, -38, 20, 76, pal.balloonDark, pal.balloon, pal.brassLight);
   ctx.beginPath();

@@ -62,19 +62,17 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  width: 58px;
-  min-height: 66px;
+  width: 42px;
+  min-height: 42px;
   padding: 5px;
   color: #efce86;
-  font: 24px Georgia, serif;
+  font: 22px Georgia, serif;
   background: linear-gradient(135deg, #3e3a28, #171d18 60%, #312a1e);
   border: 1px solid #b58d4c;
-  border-radius: 28px 28px 6px 6px;
+  border-radius: 50%;
   box-shadow: 0 3px 14px #0008, inset 0 0 0 3px #121913, inset 0 0 0 4px #80643a;
   cursor: pointer;
 }
-.control-label { font-size: 12px; letter-spacing: 0.3px; }
 .controls button:hover { color: #fff0be; border-color: #f7d692; }
 #sfx.muted { color: #ae9b7b; }
 #sfx.muted > span:first-child { text-decoration: line-through; }
@@ -87,14 +85,12 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
   width: max-content;
   max-width: calc(100% - 40px);
   margin: 0;
-  padding: 9px 18px;
-  border: 1px solid #b695545e;
-  background: #111b19e8;
+  padding: 4px 10px;
   color: #dfd0ae;
   font-size: 14px;
   line-height: 1.4;
   text-align: center;
-  box-shadow: 0 4px 16px #0005;
+  text-shadow: 0 1px 3px #000, 0 0 8px #000;
   pointer-events: none;
 }
 .room-navigation { display: none; }
@@ -109,7 +105,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
   .masthead .sub { font-size: 12px; max-width: 290px; margin: 5px auto 3px; }
   .masthead nav a { min-height: 32px; }
   .controls { top: 148px; bottom: auto; right: 50%; transform: translateX(50%); flex-direction: row; }
-  .controls button { width: 58px; min-height: 60px; }
+  .controls button { width: 42px; min-height: 42px; }
   .hint { display: none; }
   .room-navigation { position: fixed; display: grid; gap: 5px; bottom: 37px; left: 28px; right: 28px; color: var(--cream); text-align: center; padding: 8px 16px; background: #111b19ee; border: 1px solid #897244; }
   .room-navigation label { font-size: 14px; }

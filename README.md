@@ -14,27 +14,32 @@ a steampunk workshop run by cats, powered by commits.
   follows `prefers-color-scheme`.
 - Illustrated Victorian engine-room architecture, copper boilers with lit
   water levels, engraved brass gears, a moving crank, and a caged firebox.
-- Shaded animal crew with blinking eyes, whiskers, leather work aprons,
-  brass goggles, a waistcoat and watch chain, and an aviator helmet.
-- Pause the machinery with the Motion button. The workshop starts paused
+- Painted animal crew with leather aprons, goggles, a waistcoat and watch
+  chain, and an aviator helmet. A small WebGL deformation rig animates the
+  wrench, tapping paw, shovel, tails, running legs, eyes, and breathing.
+- Pause the machinery with the pause icon. The workshop starts paused
   when `prefers-reduced-motion` is enabled.
 - On phones, use the workshop slider to reach the furnace and boiler bank.
   Touches use their own coordinates, so the crew respond without mouse movement.
 
 ## Stack
 
-Vanilla ES modules + a single 2D canvas. No build step, no dependencies —
-`python3 -m http.server` and open it.
+Vanilla ES modules with a 2D scene canvas and an offscreen WebGL crew rig.
+Run `python3 -m http.server` and open it. No build step or package dependencies.
 
 ```text
 index.html      shell + masthead
 style.css       brass plaque chrome
 js/main.js      scene, layers, loop, input, palettes
-js/sprites.js   canvas draw functions (cats, dog, airship, gears, gauges)
+js/sprites.js   sprite drawing and procedural fallbacks
+js/artwork.js   atlas crops, asset loading, and painted-sprite placement
+js/crew-rig.js  animated limbs, expressions, and breathing in the painted crew
 js/data.js      live GitHub data with fallbacks
-assets/         compressed engine-room backdrop and its generation brief
+assets/         compressed backdrop, sprite atlases, and generation briefs
 ```
 
-The backdrop is a locally served 351 KiB WebP. If it cannot load, the
-procedural wall and gears still render. The scene has no new runtime
-dependencies or build step.
+The backdrop and two transparent WebP atlases total about 1.2 MiB. Gauges
+still use live readings, and the crew retains its click reactions and sounds.
+If artwork cannot load, the procedural scene remains available. If WebGL is
+unavailable, the original articulated crew is used. There are no runtime
+package dependencies or build steps.
