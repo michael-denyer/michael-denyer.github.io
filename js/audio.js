@@ -1,4 +1,4 @@
-// Synthesized workshop sounds — no samples, gesture-gated WebAudio.
+// Workshop effects and a recorded dog bark, with gesture-gated WebAudio.
 // Every public function is safe to call even if audio is unavailable.
 
 let ctx = null;
@@ -13,7 +13,7 @@ function ac() {
       master.gain.value = muted ? 0 : 0.4;
       master.connect(ctx.destination);
     }
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
   } catch {
     return null;
@@ -116,34 +116,42 @@ export function clank() {
   }
 }
 
-export function woof() {
-  // two short barks: a fast-dropping pitched "oof" plus a breathy "wh"
+// Fetching bytes does not enable audio. Decode and play only after a click.
+const dogBytes = fetch(new URL("../assets/audio/dog-bark.wav?v=1bdbbf4855e6", import.meta.url))
+  .then(response => response.ok ? response.arrayBuffer() : null)
+  .catch(() => null);
+let dogBuffer = null;
+let dogPlaying = false;
+
+async function playDog(rate, volume) {
+  if (muted || dogPlaying) return;
   const a = ac();
   if (!a) return;
-  for (const [dt, fmul] of [[0, 1], [0.24, 0.93]]) {
-    const t0 = a.currentTime + 0.01 + dt;
-    for (const [type, f0, f1, p] of [["triangle", 250, 95, 0.9], ["sine", 135, 72, 0.7]]) {
-      const osc = a.createOscillator();
-      osc.type = type;
-      osc.frequency.setValueAtTime(f0 * fmul, t0);
-      osc.frequency.exponentialRampToValueAtTime(f1 * fmul, t0 + 0.085);
-      const g = a.createGain();
-      env(a, g, t0, 0.006, 0.025, 0.085, p);
-      osc.connect(g).connect(master);
-      osc.start(t0);
-      osc.stop(t0 + 0.16);
-    }
-    const n = a.createBufferSource();
-    n.buffer = noiseBuffer(a, 0.12, true);
-    const bp = a.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 950;
-    bp.Q.value = 0.8;
-    const ng = a.createGain();
-    env(a, ng, t0, 0.004, 0.02, 0.06, 0.4);
-    n.connect(bp).connect(ng).connect(master);
-    n.start(t0);
+  dogPlaying = true;
+  try {
+    const bytes = await dogBytes;
+    if (!bytes) { dogPlaying = false; return; }
+    dogBuffer ??= await a.decodeAudioData(bytes.slice(0));
+    if (muted || a.state !== "running") { dogPlaying = false; return; }
+    const source = a.createBufferSource();
+    source.buffer = dogBuffer;
+    source.playbackRate.value = rate;
+    const gain = a.createGain();
+    gain.gain.value = volume;
+    source.connect(gain).connect(master);
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+      dogPlaying = false;
+    };
+    source.start();
+  } catch {
+    dogPlaying = false;
   }
+}
+
+export function woof() {
+  return playDog(0.95, 0.85);
 }
 
 export function toot() {
@@ -197,25 +205,8 @@ export function morse(pattern, freq = 720) {
   }
 }
 
-// small dog, big altitude — two sharp little yips
 export function yip() {
-  const a = ac();
-  if (!a) return;
-  for (const dt of [0, 0.16]) {
-    const t0 = a.currentTime + dt;
-    const osc = a.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(520, t0);
-    osc.frequency.exponentialRampToValueAtTime(290, t0 + 0.07);
-    const lp = a.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 1400;
-    const g = a.createGain();
-    env(a, g, t0, 0.008, 0.025, 0.06, 0.4);
-    osc.connect(lp).connect(g).connect(master);
-    osc.start(t0);
-    osc.stop(t0 + 0.13);
-  }
+  return playDog(1.15, 0.65);
 }
 
 export function zap() {

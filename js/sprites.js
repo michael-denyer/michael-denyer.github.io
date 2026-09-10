@@ -1,6 +1,6 @@
 // Canvas draw functions for the Aether Works scene.
 // All sprites draw at a local origin; callers translate/scale the context.
-import { hasArtwork, paint, paintCrew } from "./artwork.js?v=1424d2a11c5c";
+import { hasArtwork, paint, paintCrew } from "./artwork.js?v=1bdbbf4855e6";
 
 export const LINE = "#241c14";
 
@@ -167,20 +167,19 @@ export function gauge(ctx, x, y, r, val, label, wob, pal) {
 export function plaque(ctx, x, y, w, h, text, size, pal) {
   ctx.fillStyle = pal.brassDark;
   ctx.fillRect(x - w / 2, y, w, h);
-  ctx.fillStyle = metal(ctx, x - w / 2, y, w, h, pal.brassDark, pal.brass, pal.brassLight);
+  ctx.fillStyle = "#14231e";
   ctx.fillRect(x - w / 2 + 4, y + 4, w - 8, h - 8);
   ctx.strokeStyle = "rgba(255,234,183,0.4)";
   ctx.lineWidth = 1;
   ctx.strokeRect(x - w / 2 + 6, y + 6, w - 12, h - 12);
-  ctx.fillStyle = LINE;
-  ctx.font = `600 ${size}px Georgia, serif`;
-  // engraving must fit between the rivets — shrink a little, stay readable,
-  // and truncate whatever still doesn't fit
+  ctx.fillStyle = "#fff0cf";
+  ctx.font = `600 ${size}px Arial, sans-serif`;
+  // Keep the lettering large enough to read between the rivets.
   const room = w - 34;
   const measured = ctx.measureText(text).width;
   if (measured > room) {
-    size = Math.max(12, Math.floor((size * room) / measured));
-    ctx.font = `600 ${size}px Georgia, serif`;
+    size = Math.max(15, Math.floor((size * room) / measured));
+    ctx.font = `600 ${size}px Arial, sans-serif`;
     // middle-ellipsis so near-identical names stay distinguishable
     const original = text;
     let keep = original.length;
@@ -749,14 +748,16 @@ export function airship(ctx, t, banner, pal) {
   ctx.moveTo(-95, 6);
   ctx.quadraticCurveTo(-140, 16, -178, 8 + Math.sin(t * 0.003) * 6);
   ctx.stroke();
-  ctx.fillStyle = pal.bannerCloth;
+  ctx.fillStyle = "#14231e";
   ctx.save();
   ctx.translate(-178, 8 + Math.sin(t * 0.003) * 6);
   ctx.rotate(Math.sin(t * 0.003) * 0.06 - 0.03);
   const bw = 16 + banner.length * 10;
   ctx.fillRect(-bw, -16, bw, 32);
-  ctx.fillStyle = LINE;
-  ctx.font = "600 16px Georgia, serif";
+  ctx.strokeStyle = pal.brass;
+  ctx.strokeRect(-bw, -16, bw, 32);
+  ctx.fillStyle = "#fff0cf";
+  ctx.font = "600 17px Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(banner, -bw / 2, 6);
   ctx.restore();

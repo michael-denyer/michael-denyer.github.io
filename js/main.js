@@ -1,8 +1,8 @@
-import * as S from "./sprites.js?v=1424d2a11c5c";
-import * as sfx from "./audio.js?v=1424d2a11c5c";
-import { fallback, fetchLive } from "./data.js?v=1424d2a11c5c";
-import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js?v=1424d2a11c5c";
-import { advanceChase } from "./crew-animation.js?v=1424d2a11c5c";
+import * as S from "./sprites.js?v=1bdbbf4855e6";
+import * as sfx from "./audio.js?v=1bdbbf4855e6";
+import { fallback, fetchLive } from "./data.js?v=1bdbbf4855e6";
+import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js?v=1bdbbf4855e6";
+import { advanceChase } from "./crew-animation.js?v=1bdbbf4855e6";
 
 const W = 1920, H = 1080;
 const canvas = document.getElementById("scene");
@@ -10,7 +10,7 @@ const ctx = canvas.getContext("2d");
 const backdrop = new Image();
 let backdropReady = false;
 backdrop.addEventListener("load", () => { backdropReady = true; requestFrame(); });
-backdrop.src = new URL("../assets/engine-room.webp?v=1424d2a11c5c", import.meta.url).href;
+backdrop.src = new URL("../assets/engine-room.webp?v=1bdbbf4855e6", import.meta.url).href;
 
 const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
 let motionPaused = motionPreference.matches;
@@ -104,7 +104,23 @@ sfxBtn.addEventListener("click", () => {
 });
 
 let data = fallback;
-fetchLive().then((d) => { data = d; requestFrame(); });
+const refreshInterval = 10 * 60 * 1000;
+let lastRefresh = 0;
+let refreshing = false;
+async function refreshData() {
+  if (document.hidden || refreshing || Date.now() - lastRefresh < refreshInterval) return;
+  refreshing = true;
+  lastRefresh = Date.now();
+  try {
+    data = await fetchLive(data);
+    requestFrame();
+  } finally {
+    refreshing = false;
+  }
+}
+refreshData();
+setInterval(refreshData, refreshInterval);
+document.addEventListener("visibilitychange", refreshData);
 
 // ---- input ------------------------------------------------------------
 const mouse = { x: 0.5, y: 0.5, px: W / 2, py: H / 2 };
@@ -440,7 +456,7 @@ function machines(t) {
   S.rivet(ctx, crankX, crankY, 7);
   S.rivet(ctx, 720, crankY, 5);
   S.gauge(ctx, 500, 430, 96, Math.min(1, data.streakDays / 30), "MAINSPRING", Math.sin(t * 0.004) * 0.012, pal);
-  S.plaque(ctx, 500, 540, 220, 34, `${data.streakDays} days under steam`, 15, pal);
+  S.plaque(ctx, 500, 540, 220, 34, data.streakDays === null ? "Awaiting activity" : `${data.streakDays} days under steam`, 15, pal);
 
   // telegraph desk (center)
   ctx.fillStyle = S.metal(ctx, 850, 770, 330, 24, pal.copperDark, pal.copper, pal.copperLight);
@@ -510,7 +526,7 @@ function instrument(box, nx, ny, nr, value, wobble) {
 
 function equipmentLabel(x, y, width, text) {
   const plate = {...pal, brassDark:"#392b1c", brass:"#816638", brassLight:"#baa06b"};
-  S.plaque(ctx, x, y, width, 28, text, 13, plate);
+  S.plaque(ctx, x, y, width, 34, text, 17, plate);
 }
 
 function illustratedMachines(t) {
@@ -524,7 +540,7 @@ function illustratedMachines(t) {
   const spin = gearPhase * (0.4 + data.streakDays / 30);
   S.gear(ctx, 490, 785, 116, 16, spin, pal.brass, pal.brassDark, pal.wallBottom);
   S.gear(ctx, 655, 849, 62, 10, -spin * 116 / 62, pal.brass, pal.brassDark, pal.wallBottom);
-  equipmentLabel(530, 939, 230, `${data.streakDays} days under steam`);
+  equipmentLabel(530, 939, 230, data.streakDays === null ? "Awaiting activity" : `${data.streakDays} days under steam`);
 
   paint(ctx, "telegraph", 850, 590, 360, 340);
   equipmentLabel(1015, 939, 228, "COMMIT TELEGRAPH");
@@ -581,6 +597,16 @@ function cast(t) {
   ctx.restore();
 
   // telegraph operator (grey) on desk stool
+  if (hasArtwork("operator")) {
+    // Put the key beneath the working paw so each downward stroke has contact.
+    ctx.fillStyle = "#302318"; ctx.fillRect(952, 756, 43, 10);
+    ctx.strokeStyle = pal.brass; ctx.lineWidth = 2;
+    ctx.strokeRect(952, 756, 43, 10);
+    ctx.fillStyle = pal.brass; ctx.fillRect(973, 746, 5, 11);
+    ctx.beginPath(); ctx.ellipse(969, 745, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#201b16";
+    ctx.beginPath(); ctx.ellipse(969, 743, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.save();
   ctx.translate(940, 770);
   S.catOperator(ctx, "#9a9aa8", "#c8c8d4", t, 0.6, look(940, 700, "operator"), pal,
@@ -617,7 +643,7 @@ function cast(t) {
   const ax = ((t * 0.055 + 900) % (W + 760)) - 380;
   ctx.save();
   ctx.translate(ax, AIRSHIP_Y);
-  S.airship(ctx, t, `${data.openPrs} PR${data.openPrs === 1 ? "" : "S"} INBOUND`, pal);
+  S.airship(ctx, t, data.openPrs === null ? "GITHUB PRS" : `${data.openPrs} PR${data.openPrs === 1 ? "" : "S"} INBOUND`, pal);
   ctx.restore();
 }
 
@@ -806,14 +832,14 @@ function ticker(t) {
   ctx.font = "500 14px ui-monospace, Menlo, monospace";
   const tw = ctx.measureText(text).width;
   const off = tickerPos % tw;
-  ctx.fillStyle = "rgba(240,230,205,0.92)";
+  ctx.fillStyle = "#14231e";
   ctx.fillRect(0, bottom - 34, innerWidth, 34);
-  ctx.fillStyle = "#beb39a";
+  ctx.fillStyle = "#786743";
   for (let x = 14; x < innerWidth; x += 30) {
     ctx.fillRect(x, bottom - 28, 3, 3);
     ctx.fillRect(x, bottom - 10, 3, 3);
   }
-  ctx.fillStyle = S.LINE;
+  ctx.fillStyle = "#fff0cf";
   ctx.textAlign = "left";
   for (let x = -off; x < innerWidth; x += tw) ctx.fillText(text, x, bottom - 15);
   ctx.fillStyle = pal.brassDark;
