@@ -15,8 +15,9 @@ a steampunk workshop run by cats, powered by commits.
 - Illustrated Victorian engine-room architecture, copper boilers with lit
   water levels, engraved brass gears, a moving crank, and a caged firebox.
 - Painted animal crew with leather aprons, goggles, a waistcoat and watch
-  chain, and an aviator helmet. A small WebGL deformation rig animates the
-  wrench, tapping paw, shovel, tails, running legs, eyes, and breathing.
+  chain, and an aviator helmet. Individually drawn animation poses show
+  wrench strokes, telegraph taps, a complete shovel cycle, running strides,
+  sleeping twitches, and the pilot looking around.
 - Pause the machinery with the pause icon. The workshop starts paused
   when `prefers-reduced-motion` is enabled.
 - On phones, use the workshop slider to reach the furnace and boiler bank.
@@ -24,7 +25,7 @@ a steampunk workshop run by cats, powered by commits.
 
 ## Stack
 
-Vanilla ES modules with a 2D scene canvas and an offscreen WebGL crew rig.
+Vanilla ES modules with one 2D scene canvas.
 Run `python3 -m http.server` and open it. No build step or package dependencies.
 
 ```text
@@ -33,13 +34,16 @@ style.css       brass plaque chrome
 js/main.js      scene, layers, loop, input, palettes
 js/sprites.js   sprite drawing and procedural fallbacks
 js/artwork.js   atlas crops, asset loading, and painted-sprite placement
-js/crew-rig.js  animated limbs, expressions, and breathing in the painted crew
+js/crew-animation.js  pose timing, foot registration, and the kitten's chase
 js/data.js      live GitHub data with fallbacks
 assets/         compressed backdrop, sprite atlases, and generation briefs
 ```
 
-The backdrop and two transparent WebP atlases total about 1.2 MiB. Gauges
+The backdrop, machinery atlas, and six crew sheets total about 1.6 MiB. Gauges
 still use live readings, and the crew retains its click reactions and sounds.
-If artwork cannot load, the procedural scene remains available. If WebGL is
-unavailable, the original articulated crew is used. There are no runtime
-package dependencies or build steps.
+If artwork cannot load, the original articulated canvas crew remains
+available. There are no runtime package dependencies or build steps.
+
+For an enlarged animation study with playback controls, open
+`/scripts/crew-preview.html` on the local server. Run
+`node scripts/check-crew.mjs` to check chase continuity, turning, and pause.

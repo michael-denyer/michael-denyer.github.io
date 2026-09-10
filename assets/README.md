@@ -22,13 +22,26 @@ Constraints: Exactly one image. No characters, cats, people, text, lettering, UI
 
 ## Painted foreground
 
-`machinery-atlas.webp` and `crew-atlas.webp` were generated with the built-in
-imagegen tool using the engine-room backdrop as a style reference. Both are
-1536 by 1024 pixels. The exact generation prompts are in
-`foreground-prompts.json`. Sprite bounds are recorded in `js/artwork.js`.
+`machinery-atlas.webp` was generated with the built-in imagegen tool using the
+engine-room backdrop as a style reference. Its 1536 by 1024 image has native
+transparency. The machinery and initial crew design prompts are in
+`foreground-prompts.json`. Machinery bounds are in `js/artwork.js`.
 
-The machinery image has native transparency. The crew image's neutral
-checkerboard was removed programmatically with user authorization, preserving
-colored fur and enclosed highlights. Both atlases retain an alpha channel.
-The crew is animated at runtime by `js/crew-rig.js`; the atlas stores neutral
-poses, while the shader articulates limbs and expressions.
+## Crew animation
+
+The six WebP sheets in `crew/` contain separately generated anatomical poses.
+The built-in imagegen tool produced each sequence using the original crew
+design as its identity reference. Exact prompts are in `crew/prompts.json`.
+The original reference is preserved in commit `db20ead` as `assets/crew-atlas.webp`.
+
+Five sequences have native alpha. The kitten's baked checkerboard was removed
+programmatically under the user's existing background-removal authorization.
+`scripts/prepare-crew.mjs` separates the six silhouettes, adds padding so tools
+cannot bleed into adjacent frames, and exports 960 by 560 transparent WebPs.
+It needs Sharp for offline preparation only. Supply a JSON source manifest
+mapping each crew name to a `path`, plus `checkerboard: true` for the kitten.
+
+`js/crew-animation.js` records foot and shoulder registration points, authored
+pose order, and timing. It renders the pose images directly on the 2D canvas.
+The working crew has fixed ground anchors; the kitten's stride follows its
+distance travelled along a continuous chase path.

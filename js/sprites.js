@@ -487,7 +487,7 @@ function catHead(ctx, col, cream, look, pal, t, ph, withGoggles = true) {
 }
 
 export function catSit(ctx, col, shade, t, ph, look, pal, withGoggles = true) {
-  if (paintCrew(ctx, "engineer", t, look, ph)) return;
+  if (paintCrew(ctx, "engineer")) return;
   ctx.save();
   const sw = Math.sin(t * 0.0025 + ph);
   oval(ctx, 3, 1, 35, 5, "rgba(10,17,13,0.3)");
@@ -515,7 +515,7 @@ export function catSit(ctx, col, shade, t, ph, look, pal, withGoggles = true) {
 }
 
 export function catCurl(ctx, col, shade, t, ph) {
-  if (paintCrew(ctx, "sleeper", t, {}, ph)) return;
+  if (paintCrew(ctx, "sleeper")) return;
   ctx.save();
   ctx.scale(1, 1 + 0.025 * Math.sin(t * 0.0018 + ph));
   oval(ctx, 0, 1, 42, 4, "rgba(10,17,13,0.25)");
@@ -538,7 +538,7 @@ export function catCurl(ctx, col, shade, t, ph) {
 export function catRun(ctx, col, patch, t, dir, look, pal) {
   if (hasArtwork("kitten")) {
     ctx.save(); ctx.scale(dir, 1);
-    paintCrew(ctx, "kitten", t, {...look, x:look.x * dir});
+    paintCrew(ctx, "kitten");
     ctx.restore(); return;
   }
   ctx.save();
@@ -566,10 +566,8 @@ export function catRun(ctx, col, patch, t, dir, look, pal) {
 
 export function catOperator(ctx, col, shade, t, ph, look, pal, tapBoost = 1) {
   if (hasArtwork("operator")) {
-    ctx.save();
-    ctx.rotate(Math.max(0, Math.sin(t * 0.012 * tapBoost + ph)) * 0.025);
-    paintCrew(ctx, "operator", t, look, ph);
-    ctx.restore(); return;
+    paintCrew(ctx, "operator");
+    return;
   }
   ctx.save();
   const tap = Math.max(0, Math.sin(t * 0.012 * tapBoost + ph)) * 8;
@@ -643,9 +641,8 @@ export function steamWhistle(ctx, t, yank, pal) {
 // Bulldog stoker, with a leather apron and articulated shovel arm.
 export function dogStoker(ctx, t, pal) {
   if (hasArtwork("stoker")) {
-    ctx.save(); ctx.rotate(Math.sin(t * 0.004) * 0.045);
-    paintCrew(ctx, "stoker", t);
-    ctx.restore(); return;
+    paintCrew(ctx, "stoker");
+    return;
   }
   ctx.save();
   const cyc = Math.sin(t * 0.004);
@@ -717,7 +714,7 @@ export function dogStoker(ctx, t, pal) {
 
 function dogPilot(ctx, t) {
   if (hasArtwork("pilot")) {
-    ctx.save(); ctx.translate(6, 70); paintCrew(ctx, "pilot", t); ctx.restore();
+    ctx.save(); ctx.translate(6, 70); paintCrew(ctx, "pilot"); ctx.restore();
     return;
   }
   ctx.save();
@@ -768,7 +765,7 @@ export function airship(ctx, t, banner, pal) {
     ctx.save();
     ctx.translate(ship.x + ship.w * 0.527, ship.y + ship.h * 0.67);
     ctx.scale(0.6, 0.6);
-    if (!paintCrew(ctx, "pilot", t)) {
+    if (!paintCrew(ctx, "pilot")) {
       ctx.translate(-6, -70); dogPilot(ctx, t);
     }
     ctx.restore();

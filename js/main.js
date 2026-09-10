@@ -2,6 +2,7 @@ import * as S from "./sprites.js";
 import * as sfx from "./audio.js";
 import { fallback, fetchLive } from "./data.js";
 import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js";
+import { advanceChase } from "./crew-animation.js";
 
 const W = 1920, H = 1080;
 const canvas = document.getElementById("scene");
@@ -136,7 +137,7 @@ const JUNCTIONS = [[430, 300], [900, 300], [900, 180], [820, 640]];
 const WHISTLE = { x: 1285, y: 330 };
 
 function hotspots() {
-  const kx = runaway.x - runaway.dir * 92;
+  const kx = chasingKitten.x;
   return [
     { x: 1432, y: 505, r: 75, act: "pet", id: "ladder" },
     { x: boilerXs[1] + 75, y: hasArtwork("boiler") ? 440 : 372, r: 65, act: "pet", id: "sleeper" },
@@ -272,6 +273,7 @@ let plumes = Array.from({ length: 7 }, (_, i) => ({
   x: r1() * W, y: 250 + r1() * 500, r: 90 + r1() * 130, v: 0.12 + r1() * 0.2, ph: i,
 }));
 const runaway = { x: 760, dir: 1, min: 700, max: 1240 };
+const chasingKitten = {x:668, dir:1, velocity:90, distance:0};
 
 function look(cx, cy, petId) {
   const dx = mouse.px - cx, dy = mouse.py - cy;
@@ -572,13 +574,9 @@ function cast(t) {
   }
   ctx.restore();
 
-  // sleeping cat on middle boiler dome (vibrates while purring)
-  const purring = (fx.pets.get("sleeper") ?? 0) > nowT;
+  // Sleeping cat rests on the boiler; its drawn poses carry the small twitches.
   ctx.save();
-  ctx.translate(
-    boilerXs[1] + 75 + (purring ? Math.sin(t * 0.15) * 1.4 : 0),
-    (hasArtwork("boiler") ? 460 : 392) + (purring ? Math.sin(t * 0.11) * 0.8 : 0),
-  );
+  ctx.translate(boilerXs[1] + 75, hasArtwork("boiler") ? 460 : 392);
   S.catCurl(ctx, "#3a3a41", "#26262c", t, 1.4);
   ctx.restore();
 
@@ -589,22 +587,19 @@ function cast(t) {
     fx.telegraph > nowT ? 4 : 1);
   ctx.restore();
 
-  // stoker bulldog at the furnace (hops when boop'd)
-  const hop = fx.woof > nowT ? Math.abs(Math.sin(t * 0.02)) * 16 : 0;
+  // The stoker's feet remain planted through its scoop, lift, and tip.
   ctx.save();
-  ctx.translate(330, FLOOR - hop);
+  ctx.translate(330, FLOOR);
   ctx.scale(-1.05, 1.05);
   S.dogStoker(ctx, t, pal);
   ctx.restore();
 
   // runaway gear + chasing kitten (zoomies when freshly petted)
-  runaway.x += runaway.dir * (fx.zoomie > nowT ? 3.6 : 1.5) * frameStep;
-  if (runaway.x > runaway.max || runaway.x < runaway.min) runaway.dir *= -1;
   S.gear(ctx, runaway.x, FLOOR - 26, 26, 8, runaway.x * 0.05, pal.brassLight, pal.brassDark, pal.floor);
   ctx.save();
-  const kx = runaway.x - runaway.dir * 92;
+  const kx = chasingKitten.x;
   ctx.translate(kx, FLOOR);
-  S.catRun(ctx, "#f0ece2", "#e8954f", t, runaway.dir, look(kx, FLOOR - 30, "kitten"), pal);
+  S.catRun(ctx, "#f0ece2", "#e8954f", t, chasingKitten.dir, look(kx, FLOOR - 30, "kitten"), pal);
   ctx.restore();
 
   // startle marks while the whistle is screaming
@@ -859,11 +854,12 @@ function frame(realTime) {
   frameStep = dt / (1000 / 60);
   nowT += dt;
   const t = nowT;
+  advanceChase(runaway, chasingKitten, dt, fx.zoomie > nowT ? 216 : 90);
   animateArtwork(t, {
     engineer: look(1432, 500, "ladder"),
-    operator: {...look(940, 700, "operator"), speed:fx.telegraph > nowT ? 2.5 : 1},
+    operator: {speed:fx.telegraph > nowT ? 1.6 : 1},
     sleeper: {happy:(fx.pets.get("sleeper") ?? 0) > nowT},
-    kitten: look(runaway.x - runaway.dir * 92, FLOOR - 30, "kitten"),
+    kitten: {distance:chasingKitten.distance},
     stoker: {happy:fx.woof > nowT},
     pilot: look(airshipX(t), AIRSHIP_Y),
   });
