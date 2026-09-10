@@ -1,19 +1,34 @@
 import * as S from "./sprites.js";
 import * as sfx from "./audio.js";
 import { fallback, fetchLive } from "./data.js";
+import { loadArtwork, hasArtwork, paint, animateArtwork } from "./artwork.js";
+import { advanceChase } from "./crew-animation.js";
 
 const W = 1920, H = 1080;
 const canvas = document.getElementById("scene");
 const ctx = canvas.getContext("2d");
+const backdrop = new Image();
+let backdropReady = false;
+backdrop.addEventListener("load", () => { backdropReady = true; requestFrame(); });
+backdrop.src = new URL("../assets/engine-room.webp", import.meta.url).href;
+
+const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+let motionPaused = motionPreference.matches;
+let scheduledFrame = 0;
+let frameStep = 0;
+function requestFrame() {
+  if (!scheduledFrame) scheduledFrame = requestAnimationFrame(frame);
+}
+loadArtwork(requestFrame);
 
 const NIGHT = {
   name: "night",
-  wallTop: "#181420", wallBottom: "#0e0b14", plate: "#1f1a2a",
-  floor: "#171219", floorLine: "#231b24", glowPool: "rgba(255,176,80,0.07)",
-  brass: "#c9a24a", brassDark: "#8a6d2f", brassLight: "#e2c878",
-  copper: "#7d4a30", copperDark: "#5a3320", copperLight: "#925a3c",
+  wallTop: "#182b29", wallBottom: "#0c1412", plate: "#26352e",
+  floor: "#171c17", floorLine: "#3b3726", glowPool: "rgba(255,176,80,0.07)",
+  brass: "#b98b42", brassDark: "#4e351c", brassLight: "#f3d595",
+  copper: "#9b5d34", copperDark: "#35251a", copperLight: "#db9b62",
   gaugeFace: "#efe5cb",
-  ironGear: "#262030", ironGearDark: "#171221",
+  ironGear: "#3e493b", ironGearDark: "#141d18",
   tubeCasing: "#3a3148", aether: "#4fd8c8", aetherDim: "#2c7a72",
   aetherBright: "#bdfff4", aetherGlow: 16,
   haze: "rgba(255,170,70,0.05)",
@@ -60,10 +75,27 @@ function softGlow(x, y, rx, ry, rgb, a) {
 let pal = matchMedia("(prefers-color-scheme: dark)").matches ? NIGHT : DAY;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
   pal = e.matches ? NIGHT : DAY;
+  syncLighting();
 });
+function syncLighting() {
+  document.getElementById("mode").setAttribute("aria-pressed", String(pal.name === "night"));
+  requestFrame();
+}
 document.getElementById("mode").addEventListener("click", () => {
   pal = pal.name === "night" ? DAY : NIGHT;
+  syncLighting();
 });
+syncLighting();
+const motionBtn = document.getElementById("motion");
+function syncMotion() {
+  motionBtn.setAttribute("aria-pressed", String(motionPaused));
+  motionBtn.title = motionPaused ? "Resume the machinery" : "Pause the machinery";
+  motionBtn.querySelector(".motion-icon").textContent = motionPaused ? "▷" : "Ⅱ";
+  lastT = performance.now();
+  requestFrame();
+}
+motionBtn.addEventListener("click", () => { motionPaused = !motionPaused; syncMotion(); });
+motionPreference.addEventListener("change", (e) => { motionPaused = e.matches; syncMotion(); });
 const sfxBtn = document.getElementById("sfx");
 sfxBtn.addEventListener("click", () => {
   sfx.setMuted(!sfx.isMuted());
@@ -72,17 +104,21 @@ sfxBtn.addEventListener("click", () => {
 });
 
 let data = fallback;
-fetchLive().then((d) => { data = d; });
+fetchLive().then((d) => { data = d; requestFrame(); });
 
 // ---- input ------------------------------------------------------------
 const mouse = { x: 0.5, y: 0.5, px: W / 2, py: H / 2 };
 let view = { scale: 1, ox: 0, oy: 0 };
-addEventListener("pointermove", (e) => {
+function updatePointer(e) {
   mouse.x = e.clientX / innerWidth;
   mouse.y = e.clientY / innerHeight;
-  mouse.px = (e.clientX - view.ox) / view.scale;
-  mouse.py = (e.clientY - view.oy) / view.scale;
+  mouse.px = (e.clientX - view.ox) / view.scale + par.x * 26;
+  mouse.py = (e.clientY - view.oy) / view.scale + par.y * 14;
+}
+canvas.addEventListener("pointermove", (e) => {
+  updatePointer(e);
   canvas.style.cursor = hitSpot() ? "pointer" : "default";
+  requestFrame();
 });
 const par = { x: 0, y: 0 };
 
@@ -90,9 +126,9 @@ const par = { x: 0, y: 0 };
 // fx values are "active until" timestamps in frame time.
 const fx = { whistle: 0, woof: 0, telegraph: 0, surge: 0, zoomie: 0, pets: new Map() };
 let steamBursts = [], hearts = [], scraps = [], sparks = [], bubbles = [], parcels = [];
-let nowT = 0;
+let nowT = 1000;
 
-const AIRSHIP_Y = 150;
+const AIRSHIP_Y = 285;
 function airshipX(t) {
   return ((t * 0.055 + 900) % (W + 760)) - 380;
 }
@@ -101,10 +137,10 @@ const JUNCTIONS = [[430, 300], [900, 300], [900, 180], [820, 640]];
 const WHISTLE = { x: 1285, y: 330 };
 
 function hotspots() {
-  const kx = runaway.x - runaway.dir * 92;
+  const kx = chasingKitten.x;
   return [
     { x: 1432, y: 505, r: 75, act: "pet", id: "ladder" },
-    { x: boilerXs[1] + 75, y: 372, r: 65, act: "pet", id: "sleeper" },
+    { x: boilerXs[1] + 75, y: hasArtwork("boiler") ? 440 : 372, r: 65, act: "pet", id: "sleeper" },
     { x: 950, y: 700, r: 75, act: "pet", id: "operator" },
     { x: kx, y: FLOOR - 30, r: 65, act: "pet", id: "kitten" },
     { x: 330, y: FLOOR - 55, r: 85, act: "woof" },
@@ -204,7 +240,9 @@ function trigger(h) {
   }
 }
 
-addEventListener("pointerdown", () => {
+canvas.addEventListener("pointerdown", (e) => {
+  updatePointer(e);
+  requestFrame();
   const h = hitSpot();
   if (h) { trigger(h); return; }
   // otherwise vent steam from the nearest boiler valve
@@ -235,6 +273,7 @@ let plumes = Array.from({ length: 7 }, (_, i) => ({
   x: r1() * W, y: 250 + r1() * 500, r: 90 + r1() * 130, v: 0.12 + r1() * 0.2, ph: i,
 }));
 const runaway = { x: 760, dir: 1, min: 700, max: 1240 };
+const chasingKitten = {x:668, dir:1, velocity:90, distance:0};
 
 function look(cx, cy, petId) {
   const dx = mouse.px - cx, dy = mouse.py - cy;
@@ -257,6 +296,12 @@ function layer(fx, fy, fn) {
 
 // ---- layers ------------------------------------------------------------
 function wall(t) {
+  if (backdropReady) {
+    ctx.drawImage(backdrop, -40, -22, W + 80, H + 44);
+    ctx.fillStyle = pal.name === "night" ? "rgba(5,20,19,0.12)" : "rgba(255,193,99,0.10)";
+    ctx.fillRect(-80, -60, W + 160, H + 120);
+    return;
+  }
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, pal.wallTop);
   g.addColorStop(1, pal.wallBottom);
@@ -281,6 +326,15 @@ function wall(t) {
 }
 
 function lamps(t) {
+  if (hasArtwork("lantern")) {
+    for (const lx of [270, 1630]) {
+      ctx.save(); ctx.translate(lx, -15); ctx.rotate(Math.sin(t * 0.0006 + lx) * 0.012);
+      paint(ctx, "lantern", -38, 0, 76, 190);
+      softGlow(0, 125, 125, 150, "255,182,75", 0.09 + Math.sin(t * 0.007) * 0.01);
+      ctx.restore();
+    }
+    return;
+  }
   for (const lx of [330, 960, 1590]) {
     ctx.strokeStyle = "#3c3328";
     ctx.lineWidth = 4;
@@ -299,11 +353,11 @@ function lamps(t) {
 
 function machines(t) {
   // floor
-  ctx.fillStyle = pal.floor;
+  ctx.fillStyle = backdropReady ? "rgba(12,18,14,0.26)" : pal.floor;
   ctx.fillRect(-80, FLOOR, W + 160, H - FLOOR + 60);
   ctx.strokeStyle = pal.floorLine;
   ctx.lineWidth = 3;
-  for (let y = FLOOR + 26; y < H + 40; y += 34) {
+  for (let y = FLOOR + 26; !backdropReady && y < H + 40; y += 34) {
     ctx.beginPath(); ctx.moveTo(-80, y); ctx.lineTo(W + 80, y); ctx.stroke();
   }
   for (const lx of [330, 960, 1590]) {
@@ -316,12 +370,16 @@ function machines(t) {
     : pal;
   S.aetherTube(ctx, [[430, 560], [430, 300], [900, 300], [900, 180], [1400, 180], [1490, 330]], pulsePhase, tubePal, 4);
   S.aetherTube(ctx, [[520, 640], [820, 640], [820, 760]], pulsePhase, tubePal, 2);
+  if (hasArtwork("furnace")) { illustratedMachines(t); return; }
 
   // furnace (left)
-  ctx.fillStyle = pal.copperDark;
+  ctx.fillStyle = S.metal(ctx, 60, 560, 240, 0, pal.copperDark, pal.copper, pal.copperLight);
   ctx.fillRect(60, 560, 240, FLOOR - 560);
-  ctx.fillStyle = pal.copper;
+  ctx.fillStyle = S.metal(ctx, 74, 574, 212, 0, "#17211b", "#3a4435", "#6a6744");
   ctx.fillRect(74, 574, 212, FLOOR - 588);
+  ctx.fillStyle = S.metal(ctx, 86, 570, 184, 0, pal.brassDark, pal.brass, pal.brassLight);
+  ctx.fillRect(86, 636, 188, 238);
+  for (const rx of [81, 278]) for (const ry of [586, 626, 890, 914]) S.rivet(ctx, rx, ry, 5);
   const fireA = 0.75 + 0.25 * Math.sin(t * 0.02) * Math.sin(t * 0.007)
     + (fx.woof > nowT ? 0.3 : 0);
   ctx.fillStyle = pal.fireGlow;
@@ -347,6 +405,14 @@ function machines(t) {
     ctx.quadraticCurveTo(fx + 7, 850 - fh, fx + 14, 850);
     ctx.closePath(); ctx.fill();
   }
+  ctx.fillStyle = "#211c14";
+  for (let bar = 0; bar < 7; bar++) ctx.fillRect(106 + bar * 24, 700, 5, 160);
+  ctx.fillStyle = pal.brassDark;
+  ctx.fillRect(100, 708, 160, 5);
+  ctx.fillRect(100, 842, 160, 8);
+  ctx.fillStyle = pal.brass;
+  ctx.fillRect(266, 732, 10, 46);
+  S.gauge(ctx, 180, 602, 25, 0.7, "", Math.sin(t * 0.004) * 0.03, pal);
   S.plaque(ctx, 180, 524, 150, 34, "FIREBOX No.1", 14, pal);
   // coal pile
   ctx.fillStyle = "#15110e";
@@ -354,15 +420,30 @@ function machines(t) {
 
   // mainspring machine (center-left); gearPhase accumulates so the surge
   // overspeed accelerates smoothly instead of teleporting the teeth
-  ctx.fillStyle = pal.copperDark;
+  ctx.fillStyle = S.metal(ctx, 470, 500, 60, 0, pal.copperDark, pal.copper, pal.brass);
   ctx.fillRect(470, 500, 60, FLOOR - 500);
   S.gear(ctx, 500, 700, 130, 16, gearPhase * (0.4 + data.streakDays / 30), pal.brass, pal.brassDark, pal.wallBottom);
   S.gear(ctx, 640, 800, 64, 10, -gearPhase * (0.4 + data.streakDays / 30) * (130 / 64), pal.copper, pal.copperDark, pal.wallBottom);
+  const crankAngle = gearPhase * (0.4 + data.streakDays / 30);
+  const crankX = 500 + Math.sin(crankAngle) * 86;
+  const crankY = 700 + Math.cos(crankAngle) * 86;
+  ctx.strokeStyle = pal.brassDark;
+  ctx.lineWidth = 17;
+  ctx.beginPath(); ctx.moveTo(crankX, crankY); ctx.lineTo(720, crankY); ctx.stroke();
+  ctx.strokeStyle = pal.brassLight;
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.fillStyle = S.metal(ctx, 700, 620, 50, 0, pal.copperDark, pal.copper, pal.copperLight);
+  ctx.fillRect(698, 620, 44, 184);
+  ctx.fillStyle = pal.brass;
+  ctx.fillRect(692, crankY - 13, 56, 26);
+  S.rivet(ctx, crankX, crankY, 7);
+  S.rivet(ctx, 720, crankY, 5);
   S.gauge(ctx, 500, 430, 96, Math.min(1, data.streakDays / 30), "MAINSPRING", Math.sin(t * 0.004) * 0.012, pal);
   S.plaque(ctx, 500, 540, 220, 34, `${data.streakDays} days under steam`, 15, pal);
 
   // telegraph desk (center)
-  ctx.fillStyle = pal.copperDark;
+  ctx.fillStyle = S.metal(ctx, 850, 770, 330, 24, pal.copperDark, pal.copper, pal.copperLight);
   ctx.fillRect(850, 770, 330, 24);
   ctx.fillStyle = pal.copper;
   ctx.fillRect(866, 794, 24, FLOOR - 794);
@@ -404,12 +485,80 @@ function machines(t) {
   }
 }
 
+// Live readings are drawn inside the painted bezels, preserving the illustrated
+// rim while keeping repository activity connected to the instruments.
+function instrument(box, nx, ny, nr, value, wobble) {
+  const x = box.x + box.w * nx, y = box.y + box.h * ny, r = box.h * nr;
+  ctx.save();
+  const face = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, 0, x, y, r);
+  face.addColorStop(0, "#e6d8ad"); face.addColorStop(1, "#a8976a");
+  ctx.fillStyle = face;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#57452e"; ctx.lineWidth = Math.max(0.6, r * 0.03);
+  for (let i = 0; i <= 20; i++) {
+    const angle = 2.36 + i * 4.71 / 20;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(angle) * r * (i % 5 ? 0.78 : 0.65), y + Math.sin(angle) * r * (i % 5 ? 0.78 : 0.65));
+    ctx.lineTo(x + Math.cos(angle) * r * 0.88, y + Math.sin(angle) * r * 0.88); ctx.stroke();
+  }
+  const angle = 2.36 + Math.max(0, Math.min(1, value)) * 4.71 + wobble;
+  ctx.strokeStyle = "#5b2d21"; ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(angle) * r * 0.74, y + Math.sin(angle) * r * 0.74); ctx.stroke();
+  ctx.fillStyle = "#483623"; ctx.beginPath(); ctx.arc(x, y, r * 0.08, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function equipmentLabel(x, y, width, text) {
+  const plate = {...pal, brassDark:"#392b1c", brass:"#816638", brassLight:"#baa06b"};
+  S.plaque(ctx, x, y, width, 28, text, 13, plate);
+}
+
+function illustratedMachines(t) {
+  const fire = paint(ctx, "furnace", 45, 460, 275, 470);
+  instrument(fire, 0.5543, 0.3492, 0.038, 0.72, Math.sin(t * 0.004) * 0.035);
+  softGlow(fire.x + fire.w * 0.55, fire.y + fire.h * 0.74, 75, 75, "255,126,35", 0.12 + Math.sin(t * 0.016) * 0.025);
+  equipmentLabel(185, 932, 162, "FIREBOX No.1");
+
+  const engine = paint(ctx, "boiler", 370, 430, 310, 500);
+  instrument(engine, 0.4985, 0.3633, 0.042, data.streakDays / 30, Math.sin(t * 0.004) * 0.012);
+  const spin = gearPhase * (0.4 + data.streakDays / 30);
+  S.gear(ctx, 490, 785, 116, 16, spin, pal.brass, pal.brassDark, pal.wallBottom);
+  S.gear(ctx, 655, 849, 62, 10, -spin * 116 / 62, pal.brass, pal.brassDark, pal.wallBottom);
+  equipmentLabel(530, 939, 230, `${data.streakDays} days under steam`);
+
+  paint(ctx, "telegraph", 850, 590, 360, 340);
+  equipmentLabel(1015, 939, 228, "COMMIT TELEGRAPH");
+
+  // Side pipes overlap, like a connected bank of pressure vessels.
+  for (let i = boilerXs.length - 1; i >= 0; i--) {
+    const bx = boilerXs[i];
+    const boiler = paint(ctx, "boiler", bx - 75, 390, 300, 520);
+    const reading = data.boilers[i] ?? {name:"—", pressure:0.1};
+    instrument(boiler, 0.4985, 0.3633, 0.042, reading.pressure, Math.sin(t * 0.005 + bx) * 0.015);
+    equipmentLabel(bx + 75, 918, 168, reading.name.toUpperCase());
+  }
+  ctx.strokeStyle = "#27241a"; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.moveTo(1310, FLOOR); ctx.lineTo(1392, 470);
+  ctx.moveTo(1364, FLOOR); ctx.lineTo(1446, 470); ctx.stroke();
+  ctx.strokeStyle = "#a28a55"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = "#6e5d3d"; ctx.lineWidth = 6;
+  for (let i = 1; i <= 7; i++) {
+    const f = i / 8;
+    ctx.beginPath(); ctx.moveTo(1310 + 82 * f, FLOOR - (FLOOR - 470) * f);
+    ctx.lineTo(1364 + 82 * f, FLOOR - (FLOOR - 470) * f); ctx.stroke();
+  }
+  ctx.save(); ctx.translate(WHISTLE.x, WHISTLE.y);
+  S.steamWhistle(ctx, t, fx.whistle > nowT ? 0.8 : 0, pal);
+  ctx.restore();
+}
+
 function cast(t) {
   // ladder engineer (ginger) — top of ladder, wrench arm
   ctx.save();
   ctx.translate(1432, 560);
   ctx.scale(0.92, 0.92);
   S.catSit(ctx, "#e8954f", "#f5d9b8", t, 0.2, look(1432, 500, "ladder"), pal);
+  if (!hasArtwork("engineer")) {
   const wa = Math.sin(t * 0.006) * 0.35;
   ctx.save();
   ctx.translate(20, -46);
@@ -422,15 +571,12 @@ function cast(t) {
   ctx.fillRect(26, -34, 9, 26);
   ctx.beginPath(); ctx.arc(30, -36, 8, 0.6, 5.7); ctx.fill();
   ctx.restore();
+  }
   ctx.restore();
 
-  // sleeping cat on middle boiler dome (vibrates while purring)
-  const purring = (fx.pets.get("sleeper") ?? 0) > nowT;
+  // Sleeping cat rests on the boiler; its drawn poses carry the small twitches.
   ctx.save();
-  ctx.translate(
-    boilerXs[1] + 75 + (purring ? Math.sin(t * 0.15) * 1.4 : 0),
-    392 + (purring ? Math.sin(t * 0.11) * 0.8 : 0),
-  );
+  ctx.translate(boilerXs[1] + 75, hasArtwork("boiler") ? 460 : 392);
   S.catCurl(ctx, "#3a3a41", "#26262c", t, 1.4);
   ctx.restore();
 
@@ -441,22 +587,19 @@ function cast(t) {
     fx.telegraph > nowT ? 4 : 1);
   ctx.restore();
 
-  // stoker bulldog at the furnace (hops when boop'd)
-  const hop = fx.woof > nowT ? Math.abs(Math.sin(t * 0.02)) * 16 : 0;
+  // The stoker's feet remain planted through its scoop, lift, and tip.
   ctx.save();
-  ctx.translate(330, FLOOR - hop);
+  ctx.translate(330, FLOOR);
   ctx.scale(-1.05, 1.05);
   S.dogStoker(ctx, t, pal);
   ctx.restore();
 
   // runaway gear + chasing kitten (zoomies when freshly petted)
-  runaway.x += runaway.dir * (fx.zoomie > nowT ? 3.6 : 1.5);
-  if (runaway.x > runaway.max || runaway.x < runaway.min) runaway.dir *= -1;
   S.gear(ctx, runaway.x, FLOOR - 26, 26, 8, runaway.x * 0.05, pal.brassLight, pal.brassDark, pal.floor);
   ctx.save();
-  const kx = runaway.x - runaway.dir * 92;
+  const kx = chasingKitten.x;
   ctx.translate(kx, FLOOR);
-  S.catRun(ctx, "#f0ece2", "#e8954f", t, runaway.dir, look(kx, FLOOR - 30, "kitten"), pal);
+  S.catRun(ctx, "#f0ece2", "#e8954f", t, chasingKitten.dir, look(kx, FLOOR - 30, "kitten"), pal);
   ctx.restore();
 
   // startle marks while the whistle is screaming
@@ -473,7 +616,7 @@ function cast(t) {
   // airship crossing the rafters (~45s per crossing, on screen at load)
   const ax = ((t * 0.055 + 900) % (W + 760)) - 380;
   ctx.save();
-  ctx.translate(ax, 150);
+  ctx.translate(ax, AIRSHIP_Y);
   S.airship(ctx, t, `${data.openPrs} PR${data.openPrs === 1 ? "" : "S"} INBOUND`, pal);
   ctx.restore();
 }
@@ -483,9 +626,9 @@ function effects(t) {
   parcels = parcels.filter((p) => !p.landedAt || nowT - p.landedAt < 1400);
   for (const p of parcels) {
     if (!p.landedAt) {
-      p.vy = Math.min(1.5, p.vy + 0.02);
-      p.y += p.vy;
-      p.x += Math.sin(t * 0.002 + p.ph) * 0.8;
+      p.vy = Math.min(1.5, p.vy + 0.02 * frameStep);
+      p.y += p.vy * frameStep;
+      p.x += Math.sin(t * 0.002 + p.ph) * 0.8 * frameStep;
       if (p.y >= FLOOR - 14) {
         p.landedAt = nowT;
         sfx.clank();
@@ -533,7 +676,7 @@ function effects(t) {
   ctx.globalAlpha = 1;
   hearts = hearts.filter((h) => h.a > 0.02);
   for (const h of hearts) {
-    h.y += h.vy; h.a *= 0.985;
+    h.y += h.vy * frameStep; h.a *= Math.pow(0.985, frameStep);
     ctx.save();
     ctx.translate(h.x + Math.sin(h.y * 0.06 + h.ph) * 8, h.y);
     ctx.scale(h.s / 10, h.s / 10);
@@ -549,7 +692,8 @@ function effects(t) {
   ctx.globalAlpha = 1;
   scraps = scraps.filter((s) => s.a > 0.02);
   for (const s of scraps) {
-    s.x += s.vx; s.y += s.vy; s.vy += 0.09; s.rot += 0.1; s.a *= 0.978;
+    s.x += s.vx * frameStep; s.y += s.vy * frameStep; s.vy += 0.09 * frameStep;
+    s.rot += 0.1 * frameStep; s.a *= Math.pow(0.978, frameStep);
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(s.rot);
@@ -561,7 +705,7 @@ function effects(t) {
   ctx.globalAlpha = 1;
   sparks = sparks.filter((s) => s.a > 0.03);
   for (const s of sparks) {
-    s.x += s.vx; s.y += s.vy; s.vy += 0.05; s.a *= 0.95;
+    s.x += s.vx * frameStep; s.y += s.vy * frameStep; s.vy += 0.05 * frameStep; s.a *= Math.pow(0.95, frameStep);
     softGlow(s.x, s.y, 7, 7, s.col, s.a);
     ctx.fillStyle = `rgba(${s.col},${s.a})`;
     ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
@@ -569,7 +713,7 @@ function effects(t) {
   bubbles = bubbles.filter((b) => nowT - b.born < 1700);
   for (const b of bubbles) {
     const age = nowT - b.born;
-    const pop = Math.min(1, age / 140);
+    const pop = motionPaused ? 1 : Math.min(1, age / 140);
     const fade = age > 1300 ? 1 - (age - 1300) / 400 : 1;
     ctx.save();
     ctx.translate(b.x, b.y - pop * 8);
@@ -600,7 +744,7 @@ function effects(t) {
 function atmosphere(t) {
   // drifting steam plumes
   for (const p of plumes) {
-    p.x += p.v;
+    p.x += p.v * frameStep;
     if (p.x - p.r > W) p.x = -p.r;
     const wob = Math.sin(t * 0.0005 + p.ph) * 30;
     softGlow(p.x, p.y + wob, p.r, p.r * 0.55, pal.steamRGB, pal.steamA);
@@ -619,12 +763,13 @@ function atmosphere(t) {
   }
   steamBursts = steamBursts.filter((s) => s.a > 0.01);
   for (const s of steamBursts) {
-    s.x += s.vx; s.y += s.vy; s.vy *= 0.985; s.r += 0.5; s.a *= 0.96;
+    s.x += s.vx * frameStep; s.y += s.vy * frameStep; s.vy *= Math.pow(0.985, frameStep);
+    s.r += 0.5 * frameStep; s.a *= Math.pow(0.96, frameStep);
     softGlow(s.x, s.y, s.r, s.r, "220,216,228", s.a);
   }
   // embers above the furnace
   for (const e of embers) {
-    e.y -= e.v;
+    e.y -= e.v * frameStep;
     if (e.y < 420) e.y = FLOOR - 20;
     ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * 0.004 + e.ph));
     ctx.fillStyle = pal.ember;
@@ -634,7 +779,7 @@ function atmosphere(t) {
   // dust motes
   ctx.fillStyle = "rgba(255,225,170,0.5)";
   for (const m of motes) {
-    m.y += m.v;
+    m.y += m.v * frameStep;
     if (m.y > H) m.y = -4;
     ctx.globalAlpha = 0.12 + 0.3 * Math.abs(Math.sin(t * 0.001 + m.ph));
     ctx.beginPath();
@@ -645,28 +790,35 @@ function atmosphere(t) {
 }
 
 function foreground(t) {
-  S.gear(ctx, 1820, H + 30, 250, 16, t * 0.00035, pal.ironGear, pal.ironGearDark, pal.wallBottom);
-  S.gear(ctx, -40, H - 10, 190, 12, -t * 0.0005, pal.ironGear, pal.ironGearDark, pal.wallBottom);
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  S.gear(ctx, 1870, H + 45, 160, 16, t * 0.00035, pal.ironGear, pal.ironGearDark, pal.wallBottom);
+  S.gear(ctx, -65, H + 10, 135, 12, -t * 0.0005, pal.ironGear, pal.ironGearDark, pal.wallBottom);
+  ctx.restore();
 }
 
 function ticker(t) {
+  ctx.save();
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bottom = innerHeight;
   const text = data.ticker.join("   ···   ") + "   ···   ";
-  ctx.font = "500 19px ui-monospace, Menlo, monospace";
+  ctx.font = "500 14px ui-monospace, Menlo, monospace";
   const tw = ctx.measureText(text).width;
   const off = tickerPos % tw;
   ctx.fillStyle = "rgba(240,230,205,0.92)";
-  ctx.fillRect(0, H - 44, W, 44);
+  ctx.fillRect(0, bottom - 34, innerWidth, 34);
   ctx.fillStyle = "#beb39a";
-  for (let x = 14; x < W; x += 30) {
-    ctx.fillRect(x, H - 38, 4, 4);
-    ctx.fillRect(x, H - 10, 4, 4);
+  for (let x = 14; x < innerWidth; x += 30) {
+    ctx.fillRect(x, bottom - 28, 3, 3);
+    ctx.fillRect(x, bottom - 10, 3, 3);
   }
   ctx.fillStyle = S.LINE;
   ctx.textAlign = "left";
-  ctx.fillText(text, -off, H - 17);
-  ctx.fillText(text, -off + tw, H - 17);
+  for (let x = -off; x < innerWidth; x += tw) ctx.fillText(text, x, bottom - 15);
   ctx.fillStyle = pal.brassDark;
-  ctx.fillRect(0, H - 48, W, 6);
+  ctx.fillRect(0, bottom - 38, innerWidth, 5);
+  ctx.restore();
 }
 
 // ---- main loop -----------------------------------------------------------
@@ -676,40 +828,73 @@ function resize() {
   canvas.height = innerHeight * dpr;
   canvas.style.width = innerWidth + "px";
   canvas.style.height = innerHeight + "px";
-  const scale = Math.max(innerWidth / W, innerHeight / H);
+  const mobile = innerWidth <= 720;
+  const scale = mobile
+    ? Math.max(innerWidth / W, (innerHeight - 220) / H)
+    : Math.min(innerWidth / W, innerHeight / H);
+  const camera = mobile ? Number(document.getElementById("room-position").value) / 100 : 0.5;
   view = {
     scale,
-    ox: (innerWidth - W * scale) / 2,
-    oy: (innerHeight - H * scale) / 2,
+    ox: (innerWidth - W * scale) * camera,
+    oy: mobile ? 145 : (innerHeight - H * scale) / 2,
   };
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * view.ox, dpr * view.oy);
+  requestFrame();
 }
 addEventListener("resize", resize);
+document.getElementById("room-position").addEventListener("input", resize);
 resize();
 
 let gearPhase = 0, pulsePhase = 0, tickerPos = 0, lastT = 0;
 
-function frame(t) {
-  nowT = t;
-  const dt = Math.min(100, t - lastT);
-  lastT = t;
+function frame(realTime) {
+  scheduledFrame = 0;
+  const dt = motionPaused ? 0 : Math.min(50, realTime - lastT);
+  lastT = realTime;
+  frameStep = dt / (1000 / 60);
+  nowT += dt;
+  const t = nowT;
+  advanceChase(runaway, chasingKitten, dt, fx.zoomie > nowT ? 216 : 90);
+  animateArtwork(t, {
+    engineer: look(1432, 500, "ladder"),
+    operator: {speed:fx.telegraph > nowT ? 1.6 : 1},
+    sleeper: {happy:(fx.pets.get("sleeper") ?? 0) > nowT},
+    kitten: {distance:chasingKitten.distance},
+    stoker: {happy:fx.woof > nowT},
+    pilot: look(airshipX(t), AIRSHIP_Y),
+  });
   const surging = fx.surge > nowT;
   gearPhase += dt * 0.0011 * (surging ? 3 : 1);
   pulsePhase += dt * (surging ? 4 : 1);
   tickerPos += dt * 0.07 * (fx.telegraph > nowT ? 3.2 : 1);
   const idleX = Math.sin(t * 0.00015) * 0.3;
-  par.x += ((mouse.x - 0.5) * 2 + idleX - par.x) * 0.04;
-  par.y += ((mouse.y - 0.5) * 2 - par.y) * 0.04;
+  if (!motionPaused) {
+    par.x += ((mouse.x - 0.5) * 2 + idleX - par.x) * 0.04;
+    par.y += ((mouse.y - 0.5) * 2 - par.y) * 0.04;
+  }
   ctx.clearRect(-200, -200, W + 400, H + 400);
+  // Cover spare space on wide screens before drawing the complete workshop.
+  ctx.save();
+  ctx.resetTransform();
+  ctx.fillStyle = pal.wallBottom;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (backdropReady) {
+    const cover = Math.max(canvas.width / backdrop.width, canvas.height / backdrop.height);
+    const bw = backdrop.width * cover, bh = backdrop.height * cover;
+    ctx.drawImage(backdrop, (canvas.width - bw) / 2, (canvas.height - bh) / 2, bw, bh);
+    ctx.fillStyle = "rgba(5,15,13,0.65)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.restore();
   layer(-10, -6, () => wall(t));
   layer(-18, -10, () => lamps(t));
   layer(-26, -14, () => { machines(t); cast(t); effects(t); });
   layer(-40, -22, () => atmosphere(t));
   layer(-60, -34, () => foreground(t));
   ticker(t);
-  requestAnimationFrame(frame);
+  if (!motionPaused) requestFrame();
 }
-requestAnimationFrame(frame);
+syncMotion();
 
 // hidden hook for visual testing: /#fxtest fires every interaction at once
 if (location.hash === "#fxtest") {

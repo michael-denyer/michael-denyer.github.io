@@ -9,22 +9,30 @@
 <meta property="og:description" content="A steampunk workshop run by cats, powered by commits. Live GitHub data on brass gauges." />
 <meta property="og:url" content="https://michael-denyer.github.io" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="preload" as="image" href="assets/engine-room.webp" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <canvas id="scene" aria-hidden="true"></canvas>
 <header class="masthead">
-  <h1>THE AETHER WORKS</h1>
+  <h1><span>THE</span> AETHER WORKS</h1>
   <p class="sub">Michael Denyer · genomics &amp; data engineering</p>
-  <nav>
+  <nav aria-label="Michael's projects">
     <a href="https://github.com/michael-denyer">GitHub</a>
     <a href="https://github.com/michael-denyer/pyLocusZoom">pyLocusZoom</a>
     <a href="https://github.com/michael-denyer/jamma">jamma</a>
   </nav>
 </header>
-<button id="mode" title="flip the gas lamps" aria-label="toggle day and night">◐</button>
-<button id="sfx" title="workshop sounds" aria-label="toggle sound" aria-pressed="true">♪</button>
-<p class="hint" aria-hidden="true">psst — the staff respond to clicks</p>
+<div class="controls" role="group" aria-label="Workshop controls">
+  <button id="mode" title="Flip the gas lamps" aria-label="Night lighting" aria-pressed="false"><span aria-hidden="true">◐</span></button>
+  <button id="sfx" title="Workshop sounds" aria-label="Workshop sounds" aria-pressed="true"><span aria-hidden="true">♪</span></button>
+  <button id="motion" title="Pause the machinery" aria-label="Pause animation" aria-pressed="false"><span class="motion-icon" aria-hidden="true">Ⅱ</span></button>
+</div>
+<p class="hint">Pet the crew. Pull the whistle. Keep the works running.</p>
+<div class="room-navigation">
+  <label for="room-position">Explore the workshop</label>
+  <input id="room-position" type="range" min="0" max="100" value="50" aria-label="Workshop view, furnace on the left, boilers on the right" />
+</div>
 <noscript>
   <p class="nojs">The workshop runs on JavaScript — but the cats are still in there:
   <a href="https://github.com/michael-denyer">github.com/michael-denyer</a></p>

@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Crew animation study</title>
+<style>
+  body { margin:20px; background:#12201c; color:#e6d0a0; font:16px system-ui; }
+  button, input { margin:0 12px 12px 0; }
+  canvas { display:block; width:1080px; height:680px; max-width:100%; }
+</style>
+<button id="play">Pause</button><button id="step">Next 100 ms</button>
+<label>Time <input id="time" type="range" min="0" max="9000" step="50" value="0"></label>
+<output id="readout">0 ms</output>
+<canvas width="1080" height="680"></canvas>
+<script type="module">
+import {crew, loadCrew, animateCrew, drawCrew} from '../js/crew-animation.js';
+const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d');
+const time = document.querySelector('#time'), readout = document.querySelector('#readout');
+let t = 0, last = 0, playing = true;
+function draw() {
+  animateCrew(t, {});
+  ctx.fillStyle = '#12201c'; ctx.fillRect(0,0,1080,680);
+  Object.keys(crew).forEach((name,i) => {
+    const x = i % 3 * 360, y = Math.floor(i / 3) * 340;
+    ctx.fillStyle = '#1b2c25'; ctx.fillRect(x+5,y+5,350,330);
+    ctx.fillStyle = '#e6d0a0'; ctx.font = '18px system-ui'; ctx.fillText(name,x+20,y+30);
+    ctx.strokeStyle = '#426050'; ctx.beginPath(); ctx.moveTo(x+12,y+307); ctx.lineTo(x+348,y+307); ctx.stroke();
+    ctx.save(); ctx.translate(x+170,y+307); ctx.scale(2,2); drawCrew(ctx,name); ctx.restore();
+  });
+  time.value = t % 9000; readout.textContent = `${Math.round(t)} ms`;
+}
+loadCrew(draw);
+document.querySelector('#play').onclick = event => { playing = !playing; event.target.textContent = playing ? 'Pause' : 'Play'; };
+document.querySelector('#step').onclick = () => { playing = false; document.querySelector('#play').textContent = 'Play'; t += 100; draw(); };
+time.oninput = () => { playing = false; document.querySelector('#play').textContent = 'Play'; t = Number(time.value); draw(); };
+function tick(now) { if (playing) { t += Math.min(50,now-last); draw(); } last = now; requestAnimationFrame(tick); }
+requestAnimationFrame(tick);
+</script>
